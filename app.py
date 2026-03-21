@@ -11,14 +11,13 @@ import json
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - توحيد الخطوط بشكل كامل (بما فيها الأزرار) ومحاذاة النصوص
+# CSS - آمن جداً للخطوط بدون إجبار الأيقونات 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
     
-    /* توحيد خط تجوال على كل النصوص والأزرار */
-    .stMarkdown p, .stMarkdown div, .stMarkdown span, h1, h2, h3, h4, h5, h6, label, input, textarea, select, .stButton button p, .stButton button div { 
-        font-family: 'Tajawal', sans-serif !important; 
+    html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button { 
+        font-family: 'Tajawal', sans-serif; 
     }
     
     .stApp { background-color: #f4f7fb; }
@@ -53,9 +52,8 @@ st.markdown("""
         color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: #eff6ff !important; border-radius: 8px 8px 0 0;
     }
     
-    /* تقليل الفراغات داخل صناديق المهام */
     div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 10px !important;
+        padding: 8px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -166,6 +164,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
+        
         with st.container(height=650, border=False):
             if cal_sheet is not None:
                 with st.expander("⚙️ إضافة أو إدارة المواعيد"):
@@ -213,7 +212,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         note_val = str(row.get('Note', '')).strip()
                         
                         with st.container(border=True):
-                            cc_btn, cc_text = st.columns([1, 3], vertical_alignment="center")
+                            cc_btn, cc_text = st.columns([1.5, 4], vertical_alignment="center")
                             with cc_btn:
                                 if st.button("✅ إنجاز", key=f"done_cal_{idx}", use_container_width=True):
                                     cal_sheet.update_cell(idx + 2, 5, 'Done') 
@@ -250,7 +249,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                             note_val = str(t_row.get('Note', '')).strip()
                             
                             with st.container(border=True):
-                                # توزيع الأعمدة: الزر يساراً، الشارة بالمنتصف، والنص محاذى لليمين
                                 tc_btn, tc_badge, tc_text = st.columns([2.5, 2, 6], vertical_alignment="center")
                                 
                                 with tc_btn:
@@ -318,8 +316,16 @@ else:
                 
                 exam_df = df_display[df_display['Exam'] == exam_key]
                 for idx, row in exam_df.iterrows():
-                    current_status = row.get('Status', 'Not Started')
-                    if current_status == 'Uploaded': current_status = 'Done'
+                    
+                    # --- الحل الفولاذي لمشكلة الـ ValueError هنا ---
+                    current_status = str(row.get('Status', 'Not Started')).strip()
+                    if current_status == 'Uploaded' or current_status == '': 
+                        current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
+                    
+                    if current_status not in status_map: 
+                        current_status = 'Not Started'
+                    # -----------------------------------------------
+
                     st_info = status_map.get(current_status, status_map['Not Started'])
                     l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
                     
