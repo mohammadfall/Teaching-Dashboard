@@ -216,7 +216,7 @@ exam_colors = {
     "Final": ("#eff6ff", "#3b82f6", "#1e3a8a"), 
     "Unassigned": ("#f8fafc", "#64748b", "#334155")
 }
-default_exam_color = ("#f8fafc", "#94a3b8", "#334155") # للامتحانات المضافة يدوياً
+default_exam_color = ("#f8fafc", "#94a3b8", "#334155") 
 
 # ==========================================
 # 4. التوجيه (Routing)
@@ -224,6 +224,55 @@ default_exam_color = ("#f8fafc", "#94a3b8", "#334155") # للامتحانات ا
 
 if selected_subject == "🏠 الصفحة الرئيسية":
     st.markdown("<h2>🏠 لوحة القيادة (Overview)</h2>", unsafe_allow_html=True)
+    
+    # --- 🌟 القسم الجديد: الامتحانات القادمة (العد التنازلي) 🌟 ---
+    if not df_exams.empty:
+        upcoming_exams = []
+        for _, r in df_exams.iterrows():
+            try:
+                e_date = datetime.strptime(str(r['Date']).strip(), "%Y-%m-%d").date()
+                diff = (e_date - datetime.now().date()).days
+                if diff >= 0:  # إظهار الامتحانات القادمة أو التي تصادف اليوم فقط
+                    upcoming_exams.append({
+                        'Subject': r['Subject'], 
+                        'Exam': r['Exam'], 
+                        'Days': diff, 
+                        'DateStr': str(r['Date']).strip()
+                    })
+            except:
+                pass
+                
+        if upcoming_exams:
+            st.markdown("<h3 style='color:#1e293b; margin-top:20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>⏳ الامتحانات القادمة</h3>", unsafe_allow_html=True)
+            # ترتيب من الأقرب للأبعد
+            upcoming_exams = sorted(upcoming_exams, key=lambda x: x['Days'])
+            cols_ex = st.columns(min(len(upcoming_exams), 4)) # عرض 4 امتحانات كحد أقصى في الصف الأول
+            
+            for i, ex in enumerate(upcoming_exams[:4]):
+                with cols_ex[i]:
+                    # تحديد الألوان بناءً على قرب الموعد
+                    if ex['Days'] == 0:
+                        color_bg, color_text = "#fef2f2", "#ef4444"
+                        days_text = "اليوم!"
+                    elif ex['Days'] <= 3:
+                        color_bg, color_text = "#fef2f2", "#ef4444"
+                        days_text = f"باقي {ex['Days']} أيام"
+                    elif ex['Days'] <= 7:
+                        color_bg, color_text = "#fffbeb", "#d97706"
+                        days_text = f"باقي {ex['Days']} يوم"
+                    else:
+                        color_bg, color_text = "#f0fdf4", "#10b981"
+                        days_text = f"باقي {ex['Days']} يوم"
+                        
+                    st.markdown(f"""
+                    <div style='background:{color_bg}; border:1px solid {color_text}40; padding:15px; border-radius:10px; text-align:center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom:20px;'>
+                        <div style='font-weight:bold; color:#1e293b; font-size:1.1rem;'>{ex['Subject']}</div>
+                        <div style='font-size:0.9rem; color:#64748b; font-weight:600;'>{ex['Exam']}</div>
+                        <div style='font-weight:800; font-size:1.3rem; color:{color_text}; margin-top:5px;'>{days_text}</div>
+                        <div style='font-size:0.8rem; color:#94a3b8; margin-top:2px;'>📅 {ex['DateStr']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+    # -------------------------------------------------------------
     
     if not df_calendar.empty:
         tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
@@ -360,7 +409,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # عرض نسب الامتحانات بشكل ديناميكي للمادة
                     subj_exams = [e for e in subj_df['Exam'].unique() if str(e).strip() != ""]
                     for ex in subj_exams:
                         ex_df = subj_df[subj_df['Exam'] == ex]
@@ -371,7 +419,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                             st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.95rem; margin-top:5px; padding: 5px; background:#f8fafc; border-radius:5px;'><span>{ex}</span><span style='color:{c_color}; font-weight:bold;'>{ex_done} / {ex_total}</span></div>", unsafe_allow_html=True)
 
 else:
-    # فلترة آمنة حسب البحث
     df_display = df_lectures[df_lectures['Subject'] == selected_subject]
     if search_query:
         t_col = 'Lecture Title' if 'Lecture Title' in df_display.columns else 'Title'
@@ -381,14 +428,12 @@ else:
     with cc_title:
         st.markdown(f"<h2>⚡ إدارة: <span style='color:#2563eb;'>{selected_subject}</span></h2>", unsafe_allow_html=True)
     
-    # 🌟 ميزة إضافة محاضرة وامتحان جديد من الواجهة 🌟
     with cc_add:
         with st.popover("➕ إضافة محاضرة / امتحان جديد", use_container_width=True):
             st.markdown("**إضافة محتوى جديد لهذه المادة:**")
             with st.form(f"add_lec_form", clear_on_submit=True):
                 new_lec_title = st.text_input("اسم المحاضرة / الموضوع")
                 
-                # جلب جميع الامتحانات المعروفة كخيارات
                 all_known_exams = [e for e in df_lectures['Exam'].unique() if str(e).strip() != ""]
                 if "Unassigned" not in all_known_exams: all_known_exams.append("Unassigned")
                 
@@ -418,14 +463,12 @@ else:
     tab1, tab2, tab3 = st.tabs(["📚 خطة الإنجاز", "🎛️ المحرر الشامل", "📈 التحليلات"])
 
     with tab1:
-        # قراءة ذكية لكل الامتحانات الموجودة في المادة (ليدعم الكويزات المضافة)
         active_exams = df_display['Exam'].unique().tolist()
         active_exams = [e for e in active_exams if str(e).strip() != ""]
         if 'Unassigned' in active_exams:
             active_exams.remove('Unassigned')
-            active_exams.append('Unassigned') # لتكون دائماً في الأخير
+            active_exams.append('Unassigned') 
             
-        # تقسيم العرض ليكون 3 امتحانات في كل سطر حتى لا تنضغط الشاشة
         for i in range(0, len(active_exams), 3):
             chunk = active_exams[i:i+3]
             cols = st.columns(len(chunk))
@@ -490,20 +533,22 @@ else:
                         st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
 
                         for idx, row in exam_df.iterrows():
-                            current_status = str(row.get('Status', 'Not Started')).strip()
-                            if current_status == 'Uploaded' or current_status == '': 
-                                current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
+                            # --- 🛡️ حماية فولاذية للحالة لتجنب الـ ValueError 🛡️ ---
+                            status_val = str(row.get('Status', 'Not Started')).strip()
+                            if status_val == 'Uploaded' or status_val == '': 
+                                status_val = 'Done' if status_val == 'Uploaded' else 'Not Started'
                             
-                            if current_status not in status_map: 
-                                current_status = 'Not Started'
+                            if status_val not in status_map: 
+                                status_val = 'Not Started'
+                            # ----------------------------------------------------
 
-                            st_info = status_map.get(current_status, status_map['Not Started'])
+                            st_info = status_map.get(status_val, status_map['Not Started'])
                             l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
                             
                             expander_title = f"{st_info['icon']} 【 {st_info['label']} 】 {l_title}"
                             
                             with st.expander(expander_title):
-                                new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(current_status), key=f"sel_{idx}")
+                                new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(status_val), key=f"sel_{idx}")
                                 edit_note = row.get('Note', '')
                                 if new_stat == 'To Edit':
                                     edit_note = st.text_area("تعديل/ملاحظات:", value=str(edit_note), key=f"note_{idx}")
