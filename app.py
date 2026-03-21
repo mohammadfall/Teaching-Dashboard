@@ -11,7 +11,7 @@ import json
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن جداً للخطوط بدون إجبار الأيقونات 
+# CSS - آمن جداً ومخصص للترتيب
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -50,6 +50,11 @@ st.markdown("""
     
     button[data-baseweb="tab"][aria-selected="true"] { 
         color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: #eff6ff !important; border-radius: 8px 8px 0 0;
+    }
+    
+    /* تنسيق خاص لبطاقات المهام المدمجة لتبدو أنظف */
+    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 8px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -92,7 +97,8 @@ def get_google_data():
         if 'Exam' not in df_l.columns: df_l['Exam'] = 'Unassigned'
         if 'Note' not in df_l.columns: df_l['Note'] = ''
         
-    cal_cols = ["Date", "Time", "Subject", "Note"]
+    # تحديث التقويم ليشمل حالة الموعد (Status)
+    cal_cols = ["Date", "Time", "Subject", "Note", "Status"]
     try:
         cal_sheet = spreadsheet.worksheet("Calendar")
         c_recs = cal_sheet.get_all_records()
@@ -103,7 +109,7 @@ def get_google_data():
         else:
             df_c = pd.DataFrame(c_recs)
             for col in cal_cols:
-                if col not in df_c.columns: df_c[col] = ""
+                if col not in df_c.columns: df_c[col] = "Pending" if col == "Status" else ""
     except:
         cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
@@ -160,71 +166,77 @@ if selected_subject == "🏠 الصفحة الرئيسية":
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
-        if cal_sheet is not None:
-            with st.expander("⚙️ إضافة أو إدارة المواعيد"):
-                st.markdown("**➕ إضافة موعد جديد:**")
-                with st.form("add_cal_form_home", clear_on_submit=True):
-                    c_date = st.date_input("التاريخ")
-                    c_time = st.time_input("الوقت")
-                    c_sub = st.text_input("العنوان (مثال: وجاهي أناتومي)")
-                    c_note = st.text_area("ملاحظات (اختياري)")
-                    if st.form_submit_button("حفظ الموعد"):
-                        cal_sheet.append_row([str(c_date), str(c_time), c_sub, c_note])
-                        get_google_data.clear()
-                        st.rerun()
-                
-                st.markdown("---")
-                st.markdown("**✏️ تعديل أو حذف المواعيد الحالية:**")
-                if not df_calendar.empty:
-                    for idx, row in df_calendar.iterrows():
-                        sub_text = str(row.get('Subject', 'بدون عنوان'))
-                        with st.popover(f"📅 {row.get('Date', '')} | {sub_text}", use_container_width=True):
-                            with st.form(f"edit_cal_{idx}"):
-                                e_date = st.text_input("التاريخ", value=str(row.get('Date', '')))
-                                e_time = st.text_input("الوقت", value=str(row.get('Time', '')))
-                                e_sub = st.text_input("العنوان", value=sub_text)
-                                e_note = st.text_area("ملاحظات", value=str(row.get('Note', '')))
-                                
-                                c_save, c_del = st.columns(2)
-                                if c_save.form_submit_button("💾 حفظ التعديل"):
-                                    cal_sheet.update(range_name=f'A{idx+2}:D{idx+2}', values=[[e_date, e_time, e_sub, e_note]])
+        
+        # صندوق المواعيد ذو الارتفاع الثابت (Scrollable)
+        with st.container(height=650, border=False):
+            if cal_sheet is not None:
+                with st.expander("⚙️ إضافة أو إدارة المواعيد"):
+                    st.markdown("**➕ إضافة موعد جديد:**")
+                    with st.form("add_cal_form_home", clear_on_submit=True):
+                        c_date = st.date_input("التاريخ")
+                        c_time = st.time_input("الوقت")
+                        c_sub = st.text_input("العنوان (مثال: وجاهي أناتومي)")
+                        c_note = st.text_area("ملاحظات (اختياري)")
+                        if st.form_submit_button("حفظ الموعد"):
+                            cal_sheet.append_row([str(c_date), str(c_time), c_sub, c_note, 'Pending'])
+                            get_google_data.clear()
+                            st.rerun()
+                    
+                    st.markdown("---")
+                    st.markdown("**✏️ تعديل أو حذف المواعيد الحالية:**")
+                    if not df_calendar.empty:
+                        for idx, row in df_calendar.iterrows():
+                            if str(row.get('Status', '')) == 'Done': continue
+                            sub_text = str(row.get('Subject', 'بدون عنوان'))
+                            with st.popover(f"📅 {row.get('Date', '')} | {sub_text}", use_container_width=True):
+                                with st.form(f"edit_cal_{idx}"):
+                                    e_date = st.text_input("التاريخ", value=str(row.get('Date', '')))
+                                    e_time = st.text_input("الوقت", value=str(row.get('Time', '')))
+                                    e_sub = st.text_input("العنوان", value=sub_text)
+                                    e_note = st.text_area("ملاحظات", value=str(row.get('Note', '')))
+                                    
+                                    c_save, c_del = st.columns(2)
+                                    if c_save.form_submit_button("💾 حفظ التعديل"):
+                                        cal_sheet.update(range_name=f'A{idx+2}:D{idx+2}', values=[[e_date, e_time, e_sub, e_note]])
+                                        get_google_data.clear()
+                                        st.rerun()
+                                    if c_del.form_submit_button("🗑️ حذف الموعد"):
+                                        cal_sheet.delete_rows(idx + 2)
+                                        get_google_data.clear()
+                                        st.rerun()
+
+            if not df_calendar.empty:
+                pending_cal = df_calendar[df_calendar['Status'] != 'Done']
+                if not pending_cal.empty:
+                    for idx, row in pending_cal.tail(8).iloc[::-1].iterrows():
+                        subj_val = str(row.get('Subject', '')).strip() or "📌 موعد بدون عنوان"
+                        date_val = str(row.get('Date', '')).strip()
+                        time_val = format_to_12hr(row.get('Time', ''))
+                        note_val = str(row.get('Note', '')).strip()
+                        
+                        with st.container(border=True):
+                            cc1, cc2 = st.columns([3, 1], vertical_alignment="center")
+                            with cc1:
+                                st.markdown(f"<div style='color: #1e3a8a; font-weight: 800; font-size: 1.1rem; margin-bottom: 5px;'>{subj_val}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<span style='background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; margin-right: 5px;'>📅 {date_val}</span><span style='background: #fef2f2; color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;'>⏰ {time_val}</span>", unsafe_allow_html=True)
+                                if note_val: st.caption(f"📝 {note_val}")
+                            with cc2:
+                                if st.button("✅ إنجاز", key=f"done_cal_{idx}", use_container_width=True):
+                                    cal_sheet.update_cell(idx + 2, 5, 'Done') # تحديث عمود Status
                                     get_google_data.clear()
                                     st.rerun()
-                                if c_del.form_submit_button("🗑️ حذف الموعد"):
-                                    cal_sheet.delete_rows(idx + 2)
-                                    get_google_data.clear()
-                                    st.rerun()
-
-        if not df_calendar.empty:
-            for _, row in df_calendar.tail(5).iloc[::-1].iterrows():
-                subj_val = str(row.get('Subject', '')).strip() or "📌 موعد بدون عنوان"
-                date_val = str(row.get('Date', '')).strip()
-                time_val = format_to_12hr(row.get('Time', ''))
-                note_val = str(row.get('Note', '')).strip()
-                
-                note_html = f"<div style='color: #64748b; font-size: 0.9rem; margin-top: 10px; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border-right: 3px solid #cbd5e1;'>📝 {note_val}</div>" if note_val else ""
-
-                st.markdown(f"""
-                <div class='animate-fade' style='background: white; border-right: 5px solid #3b82f6; padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);'>
-                    <div style='color: #1e3a8a; font-weight: 800; font-size: 1.15rem; margin-bottom: 10px;'>{subj_val}</div>
-                    <div style='display: flex; gap: 15px; align-items: center;'>
-                        <div style='background: #eff6ff; color: #2563eb; padding: 4px 10px; border-radius: 6px; font-size: 0.9rem; font-weight: bold;'>📅 {date_val}</div>
-                        <div style='background: #fef2f2; color: #ef4444; padding: 4px 10px; border-radius: 6px; font-size: 0.9rem; font-weight: bold;'>⏰ {time_val}</div>
-                    </div>
-                    {note_html}
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("لا توجد مواعيد وجاهية قادمة.")
+                else:
+                    st.success("تم إنجاز جميع المواعيد القادمة! 🎉")
+            else:
+                st.info("لا توجد مواعيد وجاهية قادمة.")
 
     with col2:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 مهام هذا الأسبوع</h3>", unsafe_allow_html=True)
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                task_container = st.container(height=550) if len(pending_tasks) > 6 else st.container()
-                with task_container:
-                    # تجميع المهام حسب المادة 
+                # صندوق المهام ذو الارتفاع الثابت (Scrollable)
+                with st.container(height=650, border=False):
                     grouped_tasks = pending_tasks.groupby('Subject')
                     for subj, group in grouped_tasks:
                         st.markdown(f"""
@@ -234,16 +246,16 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # بطاقات المهام (قابلة للضغط والإنجاز السريع)
+                        # تصميم المهام النحيف (شريط واحد)
                         for idx, t_row in group.iterrows():
                             t_type = str(t_row['Task Type']).strip()
                             color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
                             icon = "🔥" if t_type == 'مراجعة' else "📑" if t_type == 'ملخص' else "📝"
                             
                             with st.container(border=True):
-                                tc1, tc2, tc3 = st.columns([5, 2, 3])
-                                tc1.markdown(f"<div style='margin-top: 8px; font-weight: 700; color: #1e293b; font-size: 0.95rem;'>{t_row['Task Name']}</div>", unsafe_allow_html=True)
-                                tc2.markdown(f"<div style='margin-top: 8px; text-align: center; font-size: 0.8rem; font-weight: 800; color: {color};'>{icon} {t_type}</div>", unsafe_allow_html=True)
+                                tc1, tc2, tc3 = st.columns([5, 3, 2], vertical_alignment="center")
+                                tc1.markdown(f"<div style='font-weight: 700; color: #1e293b; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{t_row['Task Name']}'>{t_row['Task Name']}</div>", unsafe_allow_html=True)
+                                tc2.markdown(f"<div style='text-align: center; font-size: 0.8rem; font-weight: 800; color: {color}; background: #f8fafc; border-radius: 10px; padding: 2px;'>{icon} {t_type}</div>", unsafe_allow_html=True)
                                 if tc3.button("✅ إنجاز", key=f"home_done_{idx}", use_container_width=True):
                                     tasks_sheet.update_cell(idx + 2, 4, 'Done') 
                                     get_google_data.clear()
