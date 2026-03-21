@@ -4,20 +4,21 @@ import gspread
 from google.oauth2.service_account import Credentials
 import plotly.express as px
 from datetime import datetime
+import json # تمت إضافة هذه المكتبة لقرائة الـ Secrets
 
 # ==========================================
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن جداً للخطوط بدون إجبار الأيقونات (لتجنب قلتش السهم)
+# CSS - آمن جداً للخطوط بدون إجبار الأيقونات
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
     
-    /* تطبيق الخط بطريقة آمنة لا تؤثر على أيقونات المنصة */
-    html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button { 
-        font-family: 'Tajawal', sans-serif; 
+    .stMarkdown p, h1, h2, h3, h4, h5, h6, label, input, textarea, select,
+    .stButton button p, [data-testid="stExpander"] summary p, [data-testid="stPopover"] button p { 
+        font-family: 'Tajawal', sans-serif !important; 
     }
     
     .stApp { background-color: #f4f7fb; }
@@ -66,12 +67,25 @@ def format_to_12hr(time_str):
         return str(time_str)
 
 # ==========================================
-# 2. الربط مع جوجل شيت (حماية فولاذية للجداول الفارغة)
+# 2. الربط مع جوجل شيت (يدعم السحابة + اللابتوب)
 # ==========================================
 @st.cache_resource(ttl=60)
 def get_google_data():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file("creds.json", scopes=scope)
+    
+    # 💡 التعديل هنا: فحص هل نحن على السحابة أم محلياً
+    try:
+        if "gcp_service_account" in st.secrets:
+            # السحابة (Streamlit Cloud)
+            creds_info = json.loads(st.secrets["gcp_service_account"])
+            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        else:
+            # اللابتوب (محلياً)
+            creds = Credentials.from_service_account_file("creds.json", scopes=scope)
+    except Exception as e:
+        st.error(f"⚠️ مشكلة في بيانات الربط (Credentials): {e}")
+        st.stop()
+
     client = gspread.authorize(creds)
     spreadsheet = client.open("Dashboard")
     
@@ -90,7 +104,6 @@ def get_google_data():
         c_recs = cal_sheet.get_all_records()
         if not c_recs:
             df_c = pd.DataFrame(columns=cal_cols)
-            # إنشاء العناوين إذا كان الشيت فارغاً تماماً
             if len(cal_sheet.get_all_values()) == 0:
                 cal_sheet.update(range_name='A1', values=[cal_cols])
         else:
@@ -100,14 +113,13 @@ def get_google_data():
     except:
         cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
-    # 3. المهام (حل مشكلة KeyError الجذري هنا!)
+    # 3. المهام
     tasks_cols = ["Subject", "Task Type", "Task Name", "Status", "Note"]
     try:
         tasks_sheet = spreadsheet.worksheet("Tasks")
         t_recs = tasks_sheet.get_all_records()
         if not t_recs:
             df_t = pd.DataFrame(columns=tasks_cols)
-            # إنشاء العناوين إذا كان الشيت فارغاً تماماً
             if len(tasks_sheet.get_all_values()) == 0:
                 tasks_sheet.update(range_name='A1', values=[tasks_cols])
         else:
@@ -257,7 +269,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                             st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.95rem; margin-top:5px; padding: 5px; background:#f8fafc; border-radius:5px;'><span>{ex}</span><span style='color:{c_color}; font-weight:bold;'>{ex_done} / {ex_total}</span></div>", unsafe_allow_html=True)
 
 else:
-    # فلترة آمنة
     df_display = df_lectures[df_lectures['Subject'] == selected_subject]
     if search_query:
         t_col = 'Lecture Title' if 'Lecture Title' in df_display.columns else 'Title'
@@ -299,9 +310,6 @@ else:
                             st.success("تم التحديث!")
                             st.rerun()
 
-        # ==========================================
-        # مدير المهام الجديد (مع فلترة آمنة)
-        # ==========================================
         st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='color:#1e293b;'>🛠️ مهام إضافية لـ {selected_subject}</h3>", unsafe_allow_html=True)
         
