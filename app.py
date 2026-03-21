@@ -91,6 +91,7 @@ def get_google_data():
     client = gspread.authorize(creds)
     spreadsheet = client.open("Dashboard")
     
+    # 1. المحاضرات
     tracker_sheet = spreadsheet.worksheet("Lectures Tracker")
     records_l = tracker_sheet.get_all_records()
     df_l = pd.DataFrame(records_l) if records_l else pd.DataFrame()
@@ -98,6 +99,7 @@ def get_google_data():
         if 'Exam' not in df_l.columns: df_l['Exam'] = 'Unassigned'
         if 'Note' not in df_l.columns: df_l['Note'] = ''
         
+    # 2. التقويم
     cal_cols = ["Date", "Time", "Subject", "Note", "Status"]
     try:
         cal_sheet = spreadsheet.worksheet("Calendar")
@@ -111,6 +113,7 @@ def get_google_data():
                 if col not in df_c.columns: df_c[col] = "Pending" if col == "Status" else ""
     except: cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
+    # 3. المهام
     tasks_cols = ["Subject", "Task Type", "Task Name", "Status", "Note"]
     try:
         tasks_sheet = spreadsheet.worksheet("Tasks")
@@ -132,13 +135,11 @@ df_lectures, df_calendar, df_tasks, tracker_sheet, cal_sheet, tasks_sheet = get_
 # 3. الشريط الجانبي (Sidebar) والميزات الإضافية
 # ==========================================
 with st.sidebar:
-    # 🌟 ميزة إضافية: تحية ذكية حسب الوقت
     current_hour = datetime.now().hour
     greeting = "صباح الخير ☀️" if current_hour < 12 else "مساء الخير 🌙"
     
     st.markdown(f"<div class='profile-box'><h3 style='margin:0;'>{greeting}</h3><h4>د. محمد العمري</h4></div>", unsafe_allow_html=True)
     
-    # 🌟 ميزة إضافية: شريط الإنجاز العام لكل المواد
     if not df_lectures.empty:
         total_global = len(df_lectures)
         done_global = len(df_lectures[df_lectures['Status'].isin(['Done', 'Uploaded'])])
@@ -164,7 +165,6 @@ with st.sidebar:
     st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
     search_query = st.text_input("🔍 بحث سريع عن محاضرة...", "")
     
-    # 🌟 ميزة إضافية: زر إرسال التقرير للإيميل
     email_body = "مرحباً دكتور محمد،\n\nإليك تقرير إنجازك الأسبوعي:\n\n"
     if not df_calendar.empty:
         email_body += "📅 المواعيد القادمة:\n"
@@ -198,7 +198,6 @@ exam_colors = {
 if selected_subject == "🏠 الصفحة الرئيسية":
     st.markdown("<h2>🏠 لوحة القيادة (Overview)</h2>", unsafe_allow_html=True)
     
-    # 🌟 ميزة إضافية: التنبيهات الذكية (Smart Alerts)
     if not df_calendar.empty:
         tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
         tomorrow_events = df_calendar[(df_calendar['Date'] == tomorrow) & (df_calendar['Status'] != 'Done')]
@@ -357,7 +356,6 @@ else:
         
         for col, exam_key in zip(cols, active_exams):
             with col:
-                # 🌟 ميزة إضافية: فصل الامتحانات في صناديق (Kanban Style) مريحة جداً للعين
                 with st.container(border=True):
                     bg_color, border_color, text_color = exam_colors.get(exam_key, ("#f8fafc", "#64748b", "#334155"))
                     st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
