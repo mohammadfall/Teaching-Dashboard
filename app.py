@@ -11,13 +11,14 @@ import json
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن جداً ومخصص للترتيب
+# CSS - توحيد الخطوط بشكل كامل (بما فيها الأزرار) ومحاذاة النصوص
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
     
-    html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button { 
-        font-family: 'Tajawal', sans-serif; 
+    /* توحيد خط تجوال على كل النصوص والأزرار */
+    .stMarkdown p, .stMarkdown div, .stMarkdown span, h1, h2, h3, h4, h5, h6, label, input, textarea, select, .stButton button p, .stButton button div { 
+        font-family: 'Tajawal', sans-serif !important; 
     }
     
     .stApp { background-color: #f4f7fb; }
@@ -52,9 +53,9 @@ st.markdown("""
         color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: #eff6ff !important; border-radius: 8px 8px 0 0;
     }
     
-    /* تنسيق خاص لبطاقات المهام المدمجة لتبدو أنظف */
+    /* تقليل الفراغات داخل صناديق المهام */
     div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 8px !important;
+        padding: 10px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -97,7 +98,6 @@ def get_google_data():
         if 'Exam' not in df_l.columns: df_l['Exam'] = 'Unassigned'
         if 'Note' not in df_l.columns: df_l['Note'] = ''
         
-    # تحديث التقويم ليشمل حالة الموعد (Status)
     cal_cols = ["Date", "Time", "Subject", "Note", "Status"]
     try:
         cal_sheet = spreadsheet.worksheet("Calendar")
@@ -166,8 +166,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
-        
-        # صندوق المواعيد ذو الارتفاع الثابت (Scrollable)
         with st.container(height=650, border=False):
             if cal_sheet is not None:
                 with st.expander("⚙️ إضافة أو إدارة المواعيد"):
@@ -215,16 +213,16 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         note_val = str(row.get('Note', '')).strip()
                         
                         with st.container(border=True):
-                            cc1, cc2 = st.columns([3, 1], vertical_alignment="center")
-                            with cc1:
-                                st.markdown(f"<div style='color: #1e3a8a; font-weight: 800; font-size: 1.1rem; margin-bottom: 5px;'>{subj_val}</div>", unsafe_allow_html=True)
-                                st.markdown(f"<span style='background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; margin-right: 5px;'>📅 {date_val}</span><span style='background: #fef2f2; color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;'>⏰ {time_val}</span>", unsafe_allow_html=True)
-                                if note_val: st.caption(f"📝 {note_val}")
-                            with cc2:
+                            cc_btn, cc_text = st.columns([1, 3], vertical_alignment="center")
+                            with cc_btn:
                                 if st.button("✅ إنجاز", key=f"done_cal_{idx}", use_container_width=True):
-                                    cal_sheet.update_cell(idx + 2, 5, 'Done') # تحديث عمود Status
+                                    cal_sheet.update_cell(idx + 2, 5, 'Done') 
                                     get_google_data.clear()
                                     st.rerun()
+                            with cc_text:
+                                st.markdown(f"<div style='text-align:right; color: #1e3a8a; font-weight: 800; font-size: 1.1rem; margin-bottom: 5px;'>{subj_val}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='text-align:right;'><span style='background: #eff6ff; color: #2563eb; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; margin-left: 5px;'>📅 {date_val}</span><span style='background: #fef2f2; color: #ef4444; padding: 3px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;'>⏰ {time_val}</span></div>", unsafe_allow_html=True)
+                                if note_val: st.markdown(f"<div style='text-align:right; color: #64748b; font-size: 0.85rem; margin-top: 5px;'>📝 {note_val}</div>", unsafe_allow_html=True)
                 else:
                     st.success("تم إنجاز جميع المواعيد القادمة! 🎉")
             else:
@@ -235,7 +233,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                # صندوق المهام ذو الارتفاع الثابت (Scrollable)
                 with st.container(height=650, border=False):
                     grouped_tasks = pending_tasks.groupby('Subject')
                     for subj, group in grouped_tasks:
@@ -246,20 +243,28 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # تصميم المهام النحيف (شريط واحد)
                         for idx, t_row in group.iterrows():
                             t_type = str(t_row['Task Type']).strip()
                             color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
                             icon = "🔥" if t_type == 'مراجعة' else "📑" if t_type == 'ملخص' else "📝"
+                            note_val = str(t_row.get('Note', '')).strip()
                             
                             with st.container(border=True):
-                                tc1, tc2, tc3 = st.columns([5, 3, 2], vertical_alignment="center")
-                                tc1.markdown(f"<div style='font-weight: 700; color: #1e293b; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{t_row['Task Name']}'>{t_row['Task Name']}</div>", unsafe_allow_html=True)
-                                tc2.markdown(f"<div style='text-align: center; font-size: 0.8rem; font-weight: 800; color: {color}; background: #f8fafc; border-radius: 10px; padding: 2px;'>{icon} {t_type}</div>", unsafe_allow_html=True)
-                                if tc3.button("✅ إنجاز", key=f"home_done_{idx}", use_container_width=True):
-                                    tasks_sheet.update_cell(idx + 2, 4, 'Done') 
-                                    get_google_data.clear()
-                                    st.rerun()
+                                # توزيع الأعمدة: الزر يساراً، الشارة بالمنتصف، والنص محاذى لليمين
+                                tc_btn, tc_badge, tc_text = st.columns([2.5, 2, 6], vertical_alignment="center")
+                                
+                                with tc_btn:
+                                    if st.button("✅ إنجاز", key=f"home_done_{idx}", use_container_width=True):
+                                        tasks_sheet.update_cell(idx + 2, 4, 'Done') 
+                                        get_google_data.clear()
+                                        st.rerun()
+                                        
+                                with tc_badge:
+                                    st.markdown(f"<div style='text-align: center; font-size: 0.85rem; font-weight: 800; color: {color}; background: #f8fafc; border-radius: 10px; padding: 4px; border: 1px solid {color}40;'>{icon} {t_type}</div>", unsafe_allow_html=True)
+                                    
+                                with tc_text:
+                                    note_html = f"<div style='color: #64748b; font-size: 0.8rem; margin-top: 4px;'>📝 {note_val}</div>" if note_val else ""
+                                    st.markdown(f"<div style='text-align: right; font-weight: 700; color: #1e293b; font-size: 1.05rem;'>{t_row['Task Name']}{note_html}</div>", unsafe_allow_html=True)
             else:
                 st.success("لقد أنجزت كل المهام المعلقة. 🔥")
         else:
@@ -349,8 +354,9 @@ else:
                     pending = type_tasks[type_tasks['Status'] != 'Done']
                     for idx, t_row in pending.iterrows():
                         with st.container(border=True):
-                            st.markdown(f"<b style='color:#1e293b;'>{t_row['Task Name']}</b>", unsafe_allow_html=True)
-                            if str(t_row.get('Note', '')).strip(): st.caption(f"📝 {t_row['Note']}")
+                            st.markdown(f"<div style='text-align:right;'><b style='color:#1e293b;'>{t_row['Task Name']}</b></div>", unsafe_allow_html=True)
+                            if str(t_row.get('Note', '')).strip(): 
+                                st.markdown(f"<div style='text-align:right; color:#64748b; font-size:0.85rem; margin-top:3px;'>📝 {t_row['Note']}</div>", unsafe_allow_html=True)
                             
                             c_btn, c_edit = st.columns(2)
                             if c_btn.button("✅ إنجاز", key=f"done_{idx}", use_container_width=True):
@@ -371,7 +377,7 @@ else:
                     if not completed.empty:
                         with st.expander(f"📦 المنجزة ({len(completed)})"):
                             for idx, t_row in completed.iterrows():
-                                st.markdown(f"<span style='text-decoration: line-through; color:#94a3b8;'>{t_row['Task Name']}</span>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='text-align:right;'><span style='text-decoration: line-through; color:#94a3b8;'>{t_row['Task Name']}</span></div>", unsafe_allow_html=True)
                                 if st.button("↩️ تراجع", key=f"undo_{idx}"):
                                     tasks_sheet.update_cell(idx + 2, 4, 'Pending')
                                     get_google_data.clear()
