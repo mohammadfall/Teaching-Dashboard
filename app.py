@@ -127,7 +127,7 @@ def get_google_data():
                 if col not in df_t.columns: df_t[col] = ""
     except: tasks_sheet, df_t = None, pd.DataFrame(columns=tasks_cols)
         
-    # 4. تواريخ الامتحانات (إنشاء ذكي)
+    # 4. تواريخ الامتحانات
     exams_cols = ["Subject", "Exam", "Date"]
     try:
         exams_sheet = spreadsheet.worksheet("Exam Dates")
@@ -202,7 +202,7 @@ with st.sidebar:
     st.markdown(f"<a href='{mailto_link}' target='_blank' style='display:block; text-align:center; background:#2563eb; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:1rem; box-shadow: 0 4px 6px rgba(37,99,235,0.2); transition: 0.2s;'>📧 إرسال تقرير للإيميل</a>", unsafe_allow_html=True)
 
 
-# إعدادات الألوان والحالات
+# إعدادات الألوان
 status_map = {
     'Done': {'icon': '✅', 'color': '#10b981', 'bg': '#ecfdf5', 'label': 'منجزة'},
     'In Progress': {'icon': '⏳', 'color': '#f59e0b', 'bg': '#fffbeb', 'label': 'قيد العمل'},
@@ -210,9 +210,13 @@ status_map = {
     'Not Started': {'icon': '🔴', 'color': '#64748b', 'bg': '#f8fafc', 'label': 'لم تبدأ'}
 }
 exam_colors = {
-    "First": ("#ecfdf5", "#10b981", "#064e3b"), "Second": ("#f5f3ff", "#8b5cf6", "#4c1d95"),
-    "Mid": ("#fffbeb", "#f59e0b", "#78350f"), "Final": ("#eff6ff", "#3b82f6", "#1e3a8a"), "Unassigned": ("#f8fafc", "#64748b", "#334155")
+    "First": ("#ecfdf5", "#10b981", "#064e3b"), 
+    "Second": ("#f5f3ff", "#8b5cf6", "#4c1d95"),
+    "Mid": ("#fffbeb", "#f59e0b", "#78350f"), 
+    "Final": ("#eff6ff", "#3b82f6", "#1e3a8a"), 
+    "Unassigned": ("#f8fafc", "#64748b", "#334155")
 }
+default_exam_color = ("#f8fafc", "#94a3b8", "#334155") # للامتحانات المضافة يدوياً
 
 # ==========================================
 # 4. التوجيه (Routing)
@@ -355,7 +359,10 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         <div style='width: {pct}%; background-color: #10b981; height: 100%; border-radius: 10px;'></div>
                     </div>
                     """, unsafe_allow_html=True)
-                    for ex in ["First", "Second", "Mid", "Final", "Unassigned"]:
+                    
+                    # عرض نسب الامتحانات بشكل ديناميكي للمادة
+                    subj_exams = [e for e in subj_df['Exam'].unique() if str(e).strip() != ""]
+                    for ex in subj_exams:
                         ex_df = subj_df[subj_df['Exam'] == ex]
                         if not ex_df.empty:
                             ex_total = len(ex_df)
@@ -364,109 +371,150 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                             st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.95rem; margin-top:5px; padding: 5px; background:#f8fafc; border-radius:5px;'><span>{ex}</span><span style='color:{c_color}; font-weight:bold;'>{ex_done} / {ex_total}</span></div>", unsafe_allow_html=True)
 
 else:
+    # فلترة آمنة حسب البحث
     df_display = df_lectures[df_lectures['Subject'] == selected_subject]
     if search_query:
         t_col = 'Lecture Title' if 'Lecture Title' in df_display.columns else 'Title'
         df_display = df_display[df_display[t_col].astype(str).str.contains(search_query, case=False, na=False)]
 
-    st.markdown(f"<h2>⚡ إدارة: <span style='color:#2563eb;'>{selected_subject}</span></h2>", unsafe_allow_html=True)
+    cc_title, cc_add = st.columns([3, 1], vertical_alignment="center")
+    with cc_title:
+        st.markdown(f"<h2>⚡ إدارة: <span style='color:#2563eb;'>{selected_subject}</span></h2>", unsafe_allow_html=True)
+    
+    # 🌟 ميزة إضافة محاضرة وامتحان جديد من الواجهة 🌟
+    with cc_add:
+        with st.popover("➕ إضافة محاضرة / امتحان جديد", use_container_width=True):
+            st.markdown("**إضافة محتوى جديد لهذه المادة:**")
+            with st.form(f"add_lec_form", clear_on_submit=True):
+                new_lec_title = st.text_input("اسم المحاضرة / الموضوع")
+                
+                # جلب جميع الامتحانات المعروفة كخيارات
+                all_known_exams = [e for e in df_lectures['Exam'].unique() if str(e).strip() != ""]
+                if "Unassigned" not in all_known_exams: all_known_exams.append("Unassigned")
+                
+                new_lec_exam = st.selectbox("الامتحان التابع له", all_known_exams + ["➕ امتحان جديد (كتابة يدوية)..."])
+                custom_exam_name = ""
+                if new_lec_exam == "➕ امتحان جديد (كتابة يدوية)...":
+                    custom_exam_name = st.text_input("اكتب اسم الامتحان (مثال: Quiz 1, OSPE)")
+                
+                if st.form_submit_button("حفظ المحاضرة"):
+                    final_exam_name = custom_exam_name if new_lec_exam == "➕ امتحان جديد (كتابة يدوية)..." else new_lec_exam
+                    if new_lec_title and final_exam_name:
+                        new_row = []
+                        headers = df_lectures.columns.tolist()
+                        for col in headers:
+                            if col == 'Subject': new_row.append(selected_subject)
+                            elif col == 'Exam': new_row.append(final_exam_name)
+                            elif col in ['Lecture Title', 'Title']: new_row.append(new_lec_title)
+                            elif col == 'Status': new_row.append('Not Started')
+                            elif col == 'Note': new_row.append('')
+                            else: new_row.append('')
+                        tracker_sheet.append_row(new_row)
+                        get_google_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("يرجى تعبئة كافة الحقول.")
+
     tab1, tab2, tab3 = st.tabs(["📚 خطة الإنجاز", "🎛️ المحرر الشامل", "📈 التحليلات"])
 
     with tab1:
-        exams = ["First", "Second", "Mid", "Final", "Unassigned"]
-        active_exams = [e for e in exams if not df_display[df_display['Exam'] == e].empty]
-        cols = st.columns(len(active_exams)) if active_exams else [st.container()]
-        
-        for col, exam_key in zip(cols, active_exams):
-            with col:
-                with st.container(border=True):
-                    bg_color, border_color, text_color = exam_colors.get(exam_key, ("#f8fafc", "#64748b", "#334155"))
-                    st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
-                    
-                    # 🌟 ميزة التواريخ والجاهزية الجديدة 🌟
-                    exam_date_str = ""
-                    row_idx_in_e = -1
-                    if not df_exams.empty:
-                        match_date = df_exams[(df_exams['Subject'] == selected_subject) & (df_exams['Exam'] == exam_key)]
-                        if not match_date.empty:
-                            exam_date_str = str(match_date.iloc[0]['Date']).strip()
-                            row_idx_in_e = match_date.index[0]
-                    
-                    # 1. زر إضافة وتعديل تاريخ الامتحان
-                    with st.popover("📅 تعيين تاريخ الامتحان", use_container_width=True):
-                        with st.form(f"date_form_{exam_key}"):
-                            new_date = st.date_input("اختر تاريخ الامتحان")
-                            if st.form_submit_button("حفظ التاريخ"):
-                                if exams_sheet is None:
-                                    st.warning("هناك مشكلة في إنشاء ورقة 'Exam Dates' في جوجل شيت.")
-                                else:
-                                    if row_idx_in_e != -1:
-                                        exams_sheet.update_cell(int(row_idx_in_e) + 2, 3, str(new_date))
+        # قراءة ذكية لكل الامتحانات الموجودة في المادة (ليدعم الكويزات المضافة)
+        active_exams = df_display['Exam'].unique().tolist()
+        active_exams = [e for e in active_exams if str(e).strip() != ""]
+        if 'Unassigned' in active_exams:
+            active_exams.remove('Unassigned')
+            active_exams.append('Unassigned') # لتكون دائماً في الأخير
+            
+        # تقسيم العرض ليكون 3 امتحانات في كل سطر حتى لا تنضغط الشاشة
+        for i in range(0, len(active_exams), 3):
+            chunk = active_exams[i:i+3]
+            cols = st.columns(len(chunk))
+            
+            for col, exam_key in zip(cols, chunk):
+                with col:
+                    with st.container(border=True):
+                        bg_color, border_color, text_color = exam_colors.get(exam_key, default_exam_color)
+                        st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
+                        
+                        exam_date_str = ""
+                        row_idx_in_e = -1
+                        if not df_exams.empty:
+                            match_date = df_exams[(df_exams['Subject'] == selected_subject) & (df_exams['Exam'] == exam_key)]
+                            if not match_date.empty:
+                                exam_date_str = str(match_date.iloc[0]['Date']).strip()
+                                row_idx_in_e = match_date.index[0]
+                        
+                        with st.popover("📅 تعيين تاريخ الامتحان", use_container_width=True):
+                            with st.form(f"date_form_{exam_key}"):
+                                new_date = st.date_input("اختر تاريخ الامتحان")
+                                if st.form_submit_button("حفظ التاريخ"):
+                                    if exams_sheet is None:
+                                        st.warning("هناك مشكلة في إنشاء ورقة 'Exam Dates' في جوجل شيت.")
                                     else:
-                                        exams_sheet.append_row([selected_subject, exam_key, str(new_date)])
-                                    get_google_data.clear()
-                                    st.rerun()
+                                        if row_idx_in_e != -1:
+                                            exams_sheet.update_cell(int(row_idx_in_e) + 2, 3, str(new_date))
+                                        else:
+                                            exams_sheet.append_row([selected_subject, exam_key, str(new_date)])
+                                        get_google_data.clear()
+                                        st.rerun()
 
-                    # 2. عرض العداد التنازلي ⏳
-                    if exam_date_str:
-                        try:
-                            e_date = datetime.strptime(exam_date_str, "%Y-%m-%d").date()
-                            diff = (e_date - datetime.now().date()).days
-                            if diff > 0:
-                                st.markdown(f"<div style='background:#fffbeb; color:#d97706; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fcd34d;'>⏳ باقي {diff} يوم (التاريخ: {exam_date_str})</div>", unsafe_allow_html=True)
-                            elif diff == 0:
-                                st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق يا دكتور.</div>", unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"<div style='background:#f8fafc; color:#64748b; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #e2e8f0;'>✅ انتهى الامتحان ({exam_date_str})</div>", unsafe_allow_html=True)
-                        except:
-                            pass
-                            
-                    # 3. عرض شريط الإنجاز والمتبقي 📑
-                    exam_df = df_display[df_display['Exam'] == exam_key]
-                    total_e = len(exam_df)
-                    done_e = len(exam_df[exam_df['Status'].isin(['Done', 'Uploaded'])])
-                    not_done_df = exam_df[~exam_df['Status'].isin(['Done', 'Uploaded'])]
-                    
-                    st.progress(done_e / total_e if total_e > 0 else 0)
-                    if done_e == total_e and total_e > 0:
-                        st.markdown(f"<div style='background:#ecfdf5; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #6ee7b7;'>🏆 أنت جاهز 100% للامتحان!</div>", unsafe_allow_html=True)
-                    else:
-                        st.caption(f"📈 الإنجاز: {done_e} من {total_e} محاضرات")
-                        if not not_done_df.empty:
-                            with st.expander("⚠️ المحاضرات المتبقية للامتحان"):
-                                for _, nd_row in not_done_df.iterrows():
-                                    nd_title = nd_row.get('Lecture Title', nd_row.get('Title', ''))
-                                    st.markdown(f"<div style='color:#ef4444; font-size:0.9rem; margin-bottom:4px;'>🔴 {nd_title}</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
-
-                    # عرض المحاضرات القابلة للتحديث
-                    for idx, row in exam_df.iterrows():
-                        current_status = str(row.get('Status', 'Not Started')).strip()
-                        if current_status == 'Uploaded' or current_status == '': 
-                            current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
-                        
-                        if current_status not in status_map: 
-                            current_status = 'Not Started'
-
-                        st_info = status_map.get(current_status, status_map['Not Started'])
-                        l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
-                        
-                        expander_title = f"{st_info['icon']} 【 {st_info['label']} 】 {l_title}"
-                        
-                        with st.expander(expander_title):
-                            new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(current_status), key=f"sel_{idx}")
-                            edit_note = row.get('Note', '')
-                            if new_stat == 'To Edit':
-                                edit_note = st.text_area("تعديل/ملاحظات:", value=str(edit_note), key=f"note_{idx}")
+                        if exam_date_str:
+                            try:
+                                e_date = datetime.strptime(exam_date_str, "%Y-%m-%d").date()
+                                diff = (e_date - datetime.now().date()).days
+                                if diff > 0:
+                                    st.markdown(f"<div style='background:#fffbeb; color:#d97706; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fcd34d;'>⏳ باقي {diff} يوم (التاريخ: {exam_date_str})</div>", unsafe_allow_html=True)
+                                elif diff == 0:
+                                    st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق يا دكتور.</div>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"<div style='background:#f8fafc; color:#64748b; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #e2e8f0;'>✅ انتهى الامتحان ({exam_date_str})</div>", unsafe_allow_html=True)
+                            except:
+                                pass
                                 
-                            if st.button("حفظ التغيير ✅", key=f"btn_{idx}", use_container_width=True):
-                                df_lectures.at[idx, 'Status'] = new_stat
-                                df_lectures.at[idx, 'Note'] = edit_note if new_stat == 'To Edit' else ""
-                                tracker_sheet.clear()
-                                tracker_sheet.update(range_name='A1', values=[df_lectures.columns.values.tolist()] + df_lectures.fillna("").values.tolist())
-                                st.success("تم التحديث!")
-                                st.rerun()
+                        exam_df = df_display[df_display['Exam'] == exam_key]
+                        total_e = len(exam_df)
+                        done_e = len(exam_df[exam_df['Status'].isin(['Done', 'Uploaded'])])
+                        not_done_df = exam_df[~exam_df['Status'].isin(['Done', 'Uploaded'])]
+                        
+                        st.progress(done_e / total_e if total_e > 0 else 0)
+                        if done_e == total_e and total_e > 0:
+                            st.markdown(f"<div style='background:#ecfdf5; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #6ee7b7;'>🏆 أنت جاهز 100% للامتحان!</div>", unsafe_allow_html=True)
+                        else:
+                            st.caption(f"📈 الإنجاز: {done_e} من {total_e} محاضرات")
+                            if not not_done_df.empty:
+                                with st.expander("⚠️ المحاضرات المتبقية للامتحان"):
+                                    for _, nd_row in not_done_df.iterrows():
+                                        nd_title = nd_row.get('Lecture Title', nd_row.get('Title', ''))
+                                        st.markdown(f"<div style='color:#ef4444; font-size:0.9rem; margin-bottom:4px;'>🔴 {nd_title}</div>", unsafe_allow_html=True)
+                        
+                        st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+
+                        for idx, row in exam_df.iterrows():
+                            current_status = str(row.get('Status', 'Not Started')).strip()
+                            if current_status == 'Uploaded' or current_status == '': 
+                                current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
+                            
+                            if current_status not in status_map: 
+                                current_status = 'Not Started'
+
+                            st_info = status_map.get(current_status, status_map['Not Started'])
+                            l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
+                            
+                            expander_title = f"{st_info['icon']} 【 {st_info['label']} 】 {l_title}"
+                            
+                            with st.expander(expander_title):
+                                new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(current_status), key=f"sel_{idx}")
+                                edit_note = row.get('Note', '')
+                                if new_stat == 'To Edit':
+                                    edit_note = st.text_area("تعديل/ملاحظات:", value=str(edit_note), key=f"note_{idx}")
+                                    
+                                if st.button("حفظ التغيير ✅", key=f"btn_{idx}", use_container_width=True):
+                                    df_lectures.at[idx, 'Status'] = new_stat
+                                    df_lectures.at[idx, 'Note'] = edit_note if new_stat == 'To Edit' else ""
+                                    tracker_sheet.clear()
+                                    tracker_sheet.update(range_name='A1', values=[df_lectures.columns.values.tolist()] + df_lectures.fillna("").values.tolist())
+                                    st.success("تم التحديث!")
+                                    st.rerun()
 
         st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='color:#1e293b;'>🛠️ مهام إضافية لـ {selected_subject}</h3>", unsafe_allow_html=True)
