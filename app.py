@@ -16,9 +16,8 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
     
-    .stMarkdown p, h1, h2, h3, h4, h5, h6, label, input, textarea, select,
-    .stButton button p, [data-testid="stExpander"] summary p, [data-testid="stPopover"] button p { 
-        font-family: 'Tajawal', sans-serif !important; 
+    html, body, p, h1, h2, h3, h4, h5, h6, label, input, textarea, select, button { 
+        font-family: 'Tajawal', sans-serif; 
     }
     
     .stApp { background-color: #f4f7fb; }
@@ -67,7 +66,7 @@ def format_to_12hr(time_str):
         return str(time_str)
 
 # ==========================================
-# 2. الربط مع جوجل شيت (يدعم السحابة + اللابتوب)
+# 2. الربط مع جوجل شيت 
 # ==========================================
 @st.cache_resource(ttl=60)
 def get_google_data():
@@ -225,10 +224,9 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             if not pending_tasks.empty:
                 task_container = st.container(height=550) if len(pending_tasks) > 6 else st.container()
                 with task_container:
-                    # تجميع المهام حسب المادة للترتيب البصري
+                    # تجميع المهام حسب المادة 
                     grouped_tasks = pending_tasks.groupby('Subject')
                     for subj, group in grouped_tasks:
-                        # ترويسة المادة
                         st.markdown(f"""
                         <div style='background: #f1f5f9; padding: 6px 12px; border-radius: 6px; margin-top: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;'>
                             <span style='font-weight: 800; color: #334155; font-size: 1.05rem;'>📚 {subj}</span>
@@ -236,18 +234,20 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # بطاقات المهام التابعة للمادة
+                        # بطاقات المهام (قابلة للضغط والإنجاز السريع)
                         for idx, t_row in group.iterrows():
                             t_type = str(t_row['Task Type']).strip()
                             color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
                             icon = "🔥" if t_type == 'مراجعة' else "📑" if t_type == 'ملخص' else "📝"
                             
-                            st.markdown(f"""
-                            <div class='animate-fade' style='background: white; border-right: 4px solid {color}; padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;'>
-                                <div style='color: #1e293b; font-weight: 700; font-size: 0.95rem;'>{t_row['Task Name']}</div>
-                                <div style='font-size: 0.75rem; font-weight: 800; color: {color}; background: #f8fafc; padding: 3px 8px; border-radius: 12px; border: 1px solid #f1f5f9;'>{icon} {t_type}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            with st.container(border=True):
+                                tc1, tc2, tc3 = st.columns([5, 2, 3])
+                                tc1.markdown(f"<div style='margin-top: 8px; font-weight: 700; color: #1e293b; font-size: 0.95rem;'>{t_row['Task Name']}</div>", unsafe_allow_html=True)
+                                tc2.markdown(f"<div style='margin-top: 8px; text-align: center; font-size: 0.8rem; font-weight: 800; color: {color};'>{icon} {t_type}</div>", unsafe_allow_html=True)
+                                if tc3.button("✅ إنجاز", key=f"home_done_{idx}", use_container_width=True):
+                                    tasks_sheet.update_cell(idx + 2, 4, 'Done') 
+                                    get_google_data.clear()
+                                    st.rerun()
             else:
                 st.success("لقد أنجزت كل المهام المعلقة. 🔥")
         else:
