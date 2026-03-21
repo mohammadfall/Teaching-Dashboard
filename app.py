@@ -4,14 +4,14 @@ import gspread
 from google.oauth2.service_account import Credentials
 import plotly.express as px
 from datetime import datetime
-import json # تمت إضافة هذه المكتبة لقرائة الـ Secrets
+import json
 
 # ==========================================
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن جداً للخطوط بدون إجبار الأيقونات
+# CSS - آمن جداً للخطوط بدون إجبار الأيقونات 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -73,14 +73,11 @@ def format_to_12hr(time_str):
 def get_google_data():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # 💡 التعديل هنا: فحص هل نحن على السحابة أم محلياً
     try:
         if "gcp_service_account" in st.secrets:
-            # السحابة (Streamlit Cloud)
             creds_info = json.loads(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_info, scopes=scope)
         else:
-            # اللابتوب (محلياً)
             creds = Credentials.from_service_account_file("creds.json", scopes=scope)
     except Exception as e:
         st.error(f"⚠️ مشكلة في بيانات الربط (Credentials): {e}")
@@ -89,7 +86,6 @@ def get_google_data():
     client = gspread.authorize(creds)
     spreadsheet = client.open("Dashboard")
     
-    # 1. المحاضرات
     tracker_sheet = spreadsheet.worksheet("Lectures Tracker")
     records_l = tracker_sheet.get_all_records()
     df_l = pd.DataFrame(records_l) if records_l else pd.DataFrame()
@@ -97,7 +93,6 @@ def get_google_data():
         if 'Exam' not in df_l.columns: df_l['Exam'] = 'Unassigned'
         if 'Note' not in df_l.columns: df_l['Note'] = ''
         
-    # 2. التقويم
     cal_cols = ["Date", "Time", "Subject", "Note"]
     try:
         cal_sheet = spreadsheet.worksheet("Calendar")
@@ -113,7 +108,6 @@ def get_google_data():
     except:
         cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
-    # 3. المهام
     tasks_cols = ["Subject", "Task Type", "Task Name", "Status", "Note"]
     try:
         tasks_sheet = spreadsheet.worksheet("Tasks")
@@ -229,15 +223,22 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                for idx, t_row in pending_tasks.iterrows():
-                    color = "#f59e0b" if str(t_row['Task Type']).strip() == 'مراجعة' else "#8b5cf6" if str(t_row['Task Type']).strip() == 'ملخص' else "#10b981"
-                    st.markdown(f"""
-                    <div class='animate-fade' style='background: white; border-right: 5px solid {color}; padding: 15px; border-radius: 10px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 5px;'>
-                        <div style='font-size: 0.8rem; font-weight: 800; color: {color}; background: #f8fafc; width: fit-content; padding: 3px 10px; border-radius: 20px;'>{t_row['Task Type']}</div>
-                        <div style='color: #1e293b; font-weight: 700; font-size: 1.05rem;'>{t_row['Task Name']}</div>
-                        <div style='color: #64748b; font-size: 0.9rem; font-weight: 600;'>📚 {t_row['Subject']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                # إضافة صندوق قابل للتمرير (Scrollable) إذا زاد عدد المهام عن 4 لترتيب الواجهة
+                task_container = st.container(height=420) if len(pending_tasks) > 4 else st.container()
+                with task_container:
+                    for idx, t_row in pending_tasks.iterrows():
+                        color = "#f59e0b" if str(t_row['Task Type']).strip() == 'مراجعة' else "#8b5cf6" if str(t_row['Task Type']).strip() == 'ملخص' else "#10b981"
+                        
+                        # تصميم نحيف (Compact) للبطاقات
+                        st.markdown(f"""
+                        <div class='animate-fade' style='background: white; border-right: 4px solid {color}; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center;'>
+                            <div style='display: flex; flex-direction: column; gap: 2px;'>
+                                <div style='color: #1e293b; font-weight: 700; font-size: 1.05rem;'>{t_row['Task Name']}</div>
+                                <div style='color: #64748b; font-size: 0.85rem; font-weight: 600;'>📚 {t_row['Subject']}</div>
+                            </div>
+                            <div style='font-size: 0.75rem; font-weight: 800; color: {color}; background: #f8fafc; padding: 4px 12px; border-radius: 20px; white-space: nowrap; border: 1px solid #f1f5f9;'>{t_row['Task Type']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
             else:
                 st.success("لقد أنجزت كل المهام المعلقة. 🔥")
 
