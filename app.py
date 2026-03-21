@@ -223,24 +223,35 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                # إضافة صندوق قابل للتمرير (Scrollable) إذا زاد عدد المهام عن 4 لترتيب الواجهة
-                task_container = st.container(height=420) if len(pending_tasks) > 4 else st.container()
+                task_container = st.container(height=550) if len(pending_tasks) > 6 else st.container()
                 with task_container:
-                    for idx, t_row in pending_tasks.iterrows():
-                        color = "#f59e0b" if str(t_row['Task Type']).strip() == 'مراجعة' else "#8b5cf6" if str(t_row['Task Type']).strip() == 'ملخص' else "#10b981"
-                        
-                        # تصميم نحيف (Compact) للبطاقات
+                    # تجميع المهام حسب المادة للترتيب البصري
+                    grouped_tasks = pending_tasks.groupby('Subject')
+                    for subj, group in grouped_tasks:
+                        # ترويسة المادة
                         st.markdown(f"""
-                        <div class='animate-fade' style='background: white; border-right: 4px solid {color}; padding: 12px 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center;'>
-                            <div style='display: flex; flex-direction: column; gap: 2px;'>
-                                <div style='color: #1e293b; font-weight: 700; font-size: 1.05rem;'>{t_row['Task Name']}</div>
-                                <div style='color: #64748b; font-size: 0.85rem; font-weight: 600;'>📚 {t_row['Subject']}</div>
-                            </div>
-                            <div style='font-size: 0.75rem; font-weight: 800; color: {color}; background: #f8fafc; padding: 4px 12px; border-radius: 20px; white-space: nowrap; border: 1px solid #f1f5f9;'>{t_row['Task Type']}</div>
+                        <div style='background: #f1f5f9; padding: 6px 12px; border-radius: 6px; margin-top: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;'>
+                            <span style='font-weight: 800; color: #334155; font-size: 1.05rem;'>📚 {subj}</span>
+                            <span style='background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;'>{len(group)} مهام</span>
                         </div>
                         """, unsafe_allow_html=True)
+                        
+                        # بطاقات المهام التابعة للمادة
+                        for idx, t_row in group.iterrows():
+                            t_type = str(t_row['Task Type']).strip()
+                            color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
+                            icon = "🔥" if t_type == 'مراجعة' else "📑" if t_type == 'ملخص' else "📝"
+                            
+                            st.markdown(f"""
+                            <div class='animate-fade' style='background: white; border-right: 4px solid {color}; padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;'>
+                                <div style='color: #1e293b; font-weight: 700; font-size: 0.95rem;'>{t_row['Task Name']}</div>
+                                <div style='font-size: 0.75rem; font-weight: 800; color: {color}; background: #f8fafc; padding: 3px 8px; border-radius: 12px; border: 1px solid #f1f5f9;'>{icon} {t_type}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
             else:
                 st.success("لقد أنجزت كل المهام المعلقة. 🔥")
+        else:
+            st.info("لا توجد مهام إضافية مسجلة.")
 
     st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
     st.markdown("<h3 style='color:#1e293b; margin-bottom: 20px;'>📊 نسبة الإنجاز في المواد</h3>", unsafe_allow_html=True)
