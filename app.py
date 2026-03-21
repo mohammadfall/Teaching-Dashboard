@@ -3,15 +3,16 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
+import urllib.parse
 
 # ==========================================
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن جداً للخطوط بدون إجبار الأيقونات 
+# CSS - آمن ومخصص للترتيب
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -27,7 +28,7 @@ st.markdown("""
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
     [data-testid="stExpander"] {
-        background-color: #ffffff; border-radius: 12px !important; border: 1px solid #e2e8f0;
+        background-color: #ffffff; border-radius: 10px !important; border: 1px solid #e2e8f0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 12px;
     }
     
@@ -42,11 +43,12 @@ st.markdown("""
     div[role="radiogroup"] > label[aria-checked="true"] p { color: #1e3a8a; font-weight: 800; }
 
     .profile-box {
-        text-align: center; padding: 25px 20px; margin-bottom: 15px; 
+        text-align: center; padding: 25px 15px; margin-bottom: 15px; 
         background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%); 
         border-radius: 16px; color: white; box-shadow: 0 10px 20px rgba(0,0,0,0.15);
     }
-    .profile-box h3 { color: white !important; font-size: 1.4rem !important; margin:0;}
+    .profile-box h3 { color: white !important; font-size: 1.3rem !important; margin:0;}
+    .profile-box h4 { color: #cbd5e1 !important; font-size: 1rem !important; margin-top:5px;}
     
     button[data-baseweb="tab"][aria-selected="true"] { 
         color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: #eff6ff !important; border-radius: 8px 8px 0 0;
@@ -102,14 +104,12 @@ def get_google_data():
         c_recs = cal_sheet.get_all_records()
         if not c_recs:
             df_c = pd.DataFrame(columns=cal_cols)
-            if len(cal_sheet.get_all_values()) == 0:
-                cal_sheet.update(range_name='A1', values=[cal_cols])
+            if len(cal_sheet.get_all_values()) == 0: cal_sheet.update(range_name='A1', values=[cal_cols])
         else:
             df_c = pd.DataFrame(c_recs)
             for col in cal_cols:
                 if col not in df_c.columns: df_c[col] = "Pending" if col == "Status" else ""
-    except:
-        cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
+    except: cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
     tasks_cols = ["Subject", "Task Type", "Task Name", "Status", "Note"]
     try:
@@ -117,30 +117,67 @@ def get_google_data():
         t_recs = tasks_sheet.get_all_records()
         if not t_recs:
             df_t = pd.DataFrame(columns=tasks_cols)
-            if len(tasks_sheet.get_all_values()) == 0:
-                tasks_sheet.update(range_name='A1', values=[tasks_cols])
+            if len(tasks_sheet.get_all_values()) == 0: tasks_sheet.update(range_name='A1', values=[tasks_cols])
         else:
             df_t = pd.DataFrame(t_recs)
             for col in tasks_cols:
                 if col not in df_t.columns: df_t[col] = ""
-    except:
-        tasks_sheet, df_t = None, pd.DataFrame(columns=tasks_cols)
+    except: tasks_sheet, df_t = None, pd.DataFrame(columns=tasks_cols)
         
     return df_l, df_c, df_t, tracker_sheet, cal_sheet, tasks_sheet
 
 df_lectures, df_calendar, df_tasks, tracker_sheet, cal_sheet, tasks_sheet = get_google_data()
 
 # ==========================================
-# 3. الشريط الجانبي (Sidebar)
+# 3. الشريط الجانبي (Sidebar) والميزات الإضافية
 # ==========================================
 with st.sidebar:
-    st.markdown("<div class='profile-box'><h3>👨‍⚕️ محمد العمري</h3><p style='margin:5px 0 0 0; color:#cbd5e1; font-size:1.1rem;'>Creator OS</p></div>", unsafe_allow_html=True)
+    # 🌟 ميزة إضافية: تحية ذكية حسب الوقت
+    current_hour = datetime.now().hour
+    greeting = "صباح الخير ☀️" if current_hour < 12 else "مساء الخير 🌙"
+    
+    st.markdown(f"<div class='profile-box'><h3 style='margin:0;'>{greeting}</h3><h4>د. محمد العمري</h4></div>", unsafe_allow_html=True)
+    
+    # 🌟 ميزة إضافية: شريط الإنجاز العام لكل المواد
+    if not df_lectures.empty:
+        total_global = len(df_lectures)
+        done_global = len(df_lectures[df_lectures['Status'].isin(['Done', 'Uploaded'])])
+        prog_global = int((done_global / total_global) * 100) if total_global > 0 else 0
+        
+        st.markdown(f"""
+        <div style='padding:15px; background:#ffffff; border: 1px solid #e2e8f0; border-radius:12px; margin-bottom:20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);'>
+            <div style='display:flex; justify-content:space-between; margin-bottom:8px;'>
+                <b style='color:#1e293b; font-size:0.95rem;'>الإنجاز الكلي</b>
+                <b style='color:#10b981;'>{prog_global}%</b>
+            </div>
+            <div style='width:100%; background:#e2e8f0; height:8px; border-radius:4px;'>
+                <div style='width:{prog_global}%; background:#10b981; height:100%; border-radius:4px;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("<div style='color:#64748b; font-weight:700; margin-bottom:10px; font-size:1rem;'>📂 مساحات العمل</div>", unsafe_allow_html=True)
     if not df_lectures.empty:
         subjects = ["🏠 الصفحة الرئيسية"] + list(df_lectures['Subject'].unique())
         selected_subject = st.radio("القائمة:", subjects, label_visibility="collapsed")
+    
     st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
     search_query = st.text_input("🔍 بحث سريع عن محاضرة...", "")
+    
+    # 🌟 ميزة إضافية: زر إرسال التقرير للإيميل
+    email_body = "مرحباً دكتور محمد،\n\nإليك تقرير إنجازك الأسبوعي:\n\n"
+    if not df_calendar.empty:
+        email_body += "📅 المواعيد القادمة:\n"
+        for _, r in df_calendar[df_calendar['Status'] != 'Done'].iterrows():
+            email_body += f"- {r.get('Date','')} ({r.get('Time','')}): {r.get('Subject','')}\n"
+    if not df_tasks.empty:
+        email_body += "\n🎯 المهام المعلقة:\n"
+        for _, r in df_tasks[df_tasks['Status'] != 'Done'].iterrows():
+            email_body += f"- [{r.get('Subject','')}] {r.get('Task Name','')} ({r.get('Task Type','')})\n"
+    
+    mailto_link = f"mailto:ALROTHEMATICS.MOHAMMAD0@GMAIL.COM?subject={urllib.parse.quote('تذكير مهام Creator OS 🚀')}&body={urllib.parse.quote(email_body)}"
+    st.markdown(f"<a href='{mailto_link}' target='_blank' style='display:block; text-align:center; background:#2563eb; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:1rem; box-shadow: 0 4px 6px rgba(37,99,235,0.2); transition: 0.2s;'>📧 إرسال تقرير للإيميل</a>", unsafe_allow_html=True)
+
 
 # إعدادات الألوان والحالات
 status_map = {
@@ -160,12 +197,21 @@ exam_colors = {
 
 if selected_subject == "🏠 الصفحة الرئيسية":
     st.markdown("<h2>🏠 لوحة القيادة (Overview)</h2>", unsafe_allow_html=True)
+    
+    # 🌟 ميزة إضافية: التنبيهات الذكية (Smart Alerts)
+    if not df_calendar.empty:
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+        tomorrow_events = df_calendar[(df_calendar['Date'] == tomorrow) & (df_calendar['Status'] != 'Done')]
+        if not tomorrow_events.empty:
+            for _, ev in tomorrow_events.iterrows():
+                st.warning(f"🚨 **تذكير وجاهي غداً!** لديك موعد: {ev.get('Subject')} الساعة {format_to_12hr(ev.get('Time'))}", icon="📅")
+    
     col1, col2 = st.columns([1.2, 1])
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
         
-        with st.container(height=650, border=False):
+        with st.container(height=550, border=False):
             if cal_sheet is not None:
                 with st.expander("⚙️ إضافة أو إدارة المواعيد"):
                     st.markdown("**➕ إضافة موعد جديد:**")
@@ -205,7 +251,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             if not df_calendar.empty:
                 pending_cal = df_calendar[df_calendar['Status'] != 'Done']
                 if not pending_cal.empty:
-                    for idx, row in pending_cal.tail(8).iloc[::-1].iterrows():
+                    for idx, row in pending_cal.sort_values('Date').iterrows():
                         subj_val = str(row.get('Subject', '')).strip() or "📌 موعد بدون عنوان"
                         date_val = str(row.get('Date', '')).strip()
                         time_val = format_to_12hr(row.get('Time', ''))
@@ -232,7 +278,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                with st.container(height=650, border=False):
+                with st.container(height=550, border=False):
                     grouped_tasks = pending_tasks.groupby('Subject')
                     for subj, group in grouped_tasks:
                         st.markdown(f"""
@@ -311,39 +357,38 @@ else:
         
         for col, exam_key in zip(cols, active_exams):
             with col:
-                bg_color, border_color, text_color = exam_colors.get(exam_key, ("#f8fafc", "#64748b", "#334155"))
-                st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
-                
-                exam_df = df_display[df_display['Exam'] == exam_key]
-                for idx, row in exam_df.iterrows():
+                # 🌟 ميزة إضافية: فصل الامتحانات في صناديق (Kanban Style) مريحة جداً للعين
+                with st.container(border=True):
+                    bg_color, border_color, text_color = exam_colors.get(exam_key, ("#f8fafc", "#64748b", "#334155"))
+                    st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
                     
-                    # --- الحل الفولاذي لمشكلة الـ ValueError هنا ---
-                    current_status = str(row.get('Status', 'Not Started')).strip()
-                    if current_status == 'Uploaded' or current_status == '': 
-                        current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
-                    
-                    if current_status not in status_map: 
-                        current_status = 'Not Started'
-                    # -----------------------------------------------
+                    exam_df = df_display[df_display['Exam'] == exam_key]
+                    for idx, row in exam_df.iterrows():
+                        current_status = str(row.get('Status', 'Not Started')).strip()
+                        if current_status == 'Uploaded' or current_status == '': 
+                            current_status = 'Done' if current_status == 'Uploaded' else 'Not Started'
+                        
+                        if current_status not in status_map: 
+                            current_status = 'Not Started'
 
-                    st_info = status_map.get(current_status, status_map['Not Started'])
-                    l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
-                    
-                    expander_title = f"{st_info['icon']} 【 {st_info['label']} 】 {l_title}"
-                    
-                    with st.expander(expander_title):
-                        new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(current_status), key=f"sel_{idx}")
-                        edit_note = row.get('Note', '')
-                        if new_stat == 'To Edit':
-                            edit_note = st.text_area("تعديل/ملاحظات:", value=str(edit_note), key=f"note_{idx}")
-                            
-                        if st.button("حفظ التغيير ✅", key=f"btn_{idx}", use_container_width=True):
-                            df_lectures.at[idx, 'Status'] = new_stat
-                            df_lectures.at[idx, 'Note'] = edit_note if new_stat == 'To Edit' else ""
-                            tracker_sheet.clear()
-                            tracker_sheet.update(range_name='A1', values=[df_lectures.columns.values.tolist()] + df_lectures.fillna("").values.tolist())
-                            st.success("تم التحديث!")
-                            st.rerun()
+                        st_info = status_map.get(current_status, status_map['Not Started'])
+                        l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
+                        
+                        expander_title = f"{st_info['icon']} 【 {st_info['label']} 】 {l_title}"
+                        
+                        with st.expander(expander_title):
+                            new_stat = st.selectbox("تحديث الحالة:", list(status_map.keys()), index=list(status_map.keys()).index(current_status), key=f"sel_{idx}")
+                            edit_note = row.get('Note', '')
+                            if new_stat == 'To Edit':
+                                edit_note = st.text_area("تعديل/ملاحظات:", value=str(edit_note), key=f"note_{idx}")
+                                
+                            if st.button("حفظ التغيير ✅", key=f"btn_{idx}", use_container_width=True):
+                                df_lectures.at[idx, 'Status'] = new_stat
+                                df_lectures.at[idx, 'Note'] = edit_note if new_stat == 'To Edit' else ""
+                                tracker_sheet.clear()
+                                tracker_sheet.update(range_name='A1', values=[df_lectures.columns.values.tolist()] + df_lectures.fillna("").values.tolist())
+                                st.success("تم التحديث!")
+                                st.rerun()
 
         st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
         st.markdown(f"<h3 style='color:#1e293b;'>🛠️ مهام إضافية لـ {selected_subject}</h3>", unsafe_allow_html=True)
