@@ -12,7 +12,7 @@ import urllib.parse
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - تصميم آمن، تبويبات متساوية، وتنسيق نظيف
+# CSS - تصميم آمن، متوافق كلياً مع الموبايل (Responsive) وعرضي للمنجزات
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -27,7 +27,7 @@ st.markdown("""
     .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    /* 🌟 توحيد أحجام التبويبات في الشريط الجانبي 🌟 */
+    /* توحيد أحجام التبويبات في الشريط الجانبي */
     div[role="radiogroup"] { gap: 10px !important; padding-top: 10px;}
     div[role="radiogroup"] > label {
         width: 100%; 
@@ -75,6 +75,16 @@ st.markdown("""
     
     div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
         padding: 8px !important;
+    }
+    
+    /* 📱 تحسينات مخصصة للهواتف الذكية 📱 */
+    @media (max-width: 768px) {
+        .profile-box { padding: 15px 10px; }
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.3rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] { padding: 5px !important; }
+        .stButton button { width: 100% !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -164,7 +174,6 @@ def get_google_data():
         except: df_e = pd.DataFrame(columns=exams_cols)
     else: df_e = pd.DataFrame(columns=exams_cols)
 
-    # 🌟 إنشاء ورقة مهام اليوم (Daily ToDo) 🌟
     todo_cols = ["Task Name", "Status", "Date"]
     try:
         todo_sheet = spreadsheet.worksheet("Daily ToDo")
@@ -293,7 +302,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             for _, ev in tomorrow_events.iterrows():
                 st.warning(f"🚨 **تذكير وجاهي غداً!** لديك موعد: {ev.get('Subject')} الساعة {format_to_12hr(ev.get('Time'))}", icon="📅")
     
-    col1, col2 = st.columns([1.2, 1])
+    col1, col2 = st.columns([1, 1]) # جعل الأعمدة متساوية لتحسين العرض على الموبايل
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
@@ -307,7 +316,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         c_time = st.time_input("الوقت")
                         c_sub = st.text_input("العنوان (مثال: وجاهي أناتومي)")
                         c_note = st.text_area("ملاحظات (اختياري)")
-                        if st.form_submit_button("حفظ الموعد"):
+                        if st.form_submit_button("حفظ الموعد", use_container_width=True):
                             cal_sheet.append_row([str(c_date), str(c_time), c_sub, c_note, 'Pending'])
                             get_google_data.clear()
                             st.rerun()
@@ -326,11 +335,11 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                                     e_note = st.text_area("ملاحظات", value=str(row.get('Note', '')))
                                     
                                     c_save, c_del = st.columns(2)
-                                    if c_save.form_submit_button("💾 حفظ التعديل"):
+                                    if c_save.form_submit_button("💾 حفظ التعديل", use_container_width=True):
                                         cal_sheet.update(range_name=f'A{idx+2}:D{idx+2}', values=[[e_date, e_time, e_sub, e_note]])
                                         get_google_data.clear()
                                         st.rerun()
-                                    if c_del.form_submit_button("🗑️ حذف الموعد"):
+                                    if c_del.form_submit_button("🗑️ حذف الموعد", use_container_width=True):
                                         cal_sheet.delete_rows(idx + 2)
                                         get_google_data.clear()
                                         st.rerun()
@@ -345,7 +354,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         note_val = str(row.get('Note', '')).strip()
                         
                         with st.container(border=True):
-                            cc_btn, cc_text = st.columns([1.5, 4], vertical_alignment="center")
+                            cc_btn, cc_text = st.columns([1, 4], vertical_alignment="center")
                             with cc_btn:
                                 if st.button("✅ إنجاز", key=f"done_cal_{idx}", use_container_width=True):
                                     cal_sheet.update_cell(idx + 2, 5, 'Done') 
@@ -361,44 +370,38 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                 st.info("لا توجد مواعيد وجاهية قادمة.")
 
     with col2:
-        # 🌟 التصميم الجديد: بؤرة التركيز التفاعلية (To-Do List اليومية) 🌟
-        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 خطة اليوم (Daily To-Do)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 مهام اليوم (To-Do List)</h3>", unsafe_allow_html=True)
         
-        # 1. إضافة مهمة جديدة لليوم (بالكتابة أو بالاختيار)
         with st.form("todo_add_form", clear_on_submit=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#475569; margin-bottom:5px;'>ماذا ستنجز اليوم؟</div>", unsafe_allow_html=True)
             
-            # جلب المهام المسجلة مسبقاً لعرضها كخيارات
-            existing_tasks_list = ["-- اكتب مهمة جديدة أو اختر من القائمة --"]
+            existing_tasks_list = ["-- اكتب مهمة جديدة أو اختر من المتراكم --"]
             if not df_tasks.empty:
                 pending_t = df_tasks[df_tasks['Status'] != 'Done']
                 for _, r in pending_t.iterrows():
                     existing_tasks_list.append(f"{r['Task Name']} ({r['Subject']} - {r['Task Type']})")
             
-            c_sel, c_txt = st.columns([1, 1])
-            selected_existing = c_sel.selectbox("اختر من المهام المتراكمة:", existing_tasks_list, label_visibility="collapsed")
-            custom_task = c_txt.text_input("أو اكتب مهمة جديدة حرة:", placeholder="مثال: مراجعة سريعة، شراء قهوة...", label_visibility="collapsed")
+            selected_existing = st.selectbox("اختر من المهام المتراكمة:", existing_tasks_list, label_visibility="collapsed")
+            custom_task = st.text_input("أو اكتب مهمة جديدة حرة:", placeholder="مثال: طباعة الشيتات...", label_visibility="collapsed")
             
             if st.form_submit_button("إضافة للقائمة ➕", use_container_width=True):
-                task_to_add = custom_task.strip() if custom_task.strip() else (selected_existing if selected_existing != "-- اكتب مهمة جديدة أو اختر من القائمة --" else "")
+                task_to_add = custom_task.strip() if custom_task.strip() else (selected_existing if selected_existing != "-- اكتب مهمة جديدة أو اختر من المتراكم --" else "")
                 if task_to_add:
                     if todo_sheet is not None:
                         todo_sheet.append_row([task_to_add, "Pending", str(datetime.now().date())])
                         get_google_data.clear()
                         st.rerun()
         
-        # 2. عرض مهام اليوم
         with st.container(height=350, border=False):
             if not df_todo.empty:
                 pending_todo = df_todo[df_todo['Status'] != 'Done']
                 if not pending_todo.empty:
                     for idx, row in pending_todo.iterrows():
                         with st.container(border=True):
-                            tc_btn, tc_text, tc_del = st.columns([1.5, 7, 1.5], vertical_alignment="center")
+                            tc_btn, tc_text, tc_del = st.columns([1.5, 6, 1.5], vertical_alignment="center")
                             with tc_btn:
-                                if st.button("⬜", key=f"td_done_{idx}", help="تم الإنجاز"):
+                                if st.button("⬜", key=f"td_done_{idx}", help="تم الإنجاز", use_container_width=True):
                                     todo_sheet.update_cell(idx + 2, 2, 'Done')
-                                    # التحديث التلقائي للمهمة الأصلية إذا كانت مختارة من القائمة
                                     if not df_tasks.empty:
                                         for t_idx, t_row in df_tasks.iterrows():
                                             if f"{t_row['Task Name']} ({t_row['Subject']} - {t_row['Task Type']})" == row['Task Name']:
@@ -407,9 +410,9 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                                     get_google_data.clear()
                                     st.rerun()
                             with tc_text:
-                                st.markdown(f"<div style='font-size:1.05rem; font-weight:700; color:#1e293b;'>{row['Task Name']}</div>", unsafe_allow_html=True)
+                                st.markdown(f"<div style='font-size:1rem; font-weight:700; color:#1e293b; text-align:right;'>{row['Task Name']}</div>", unsafe_allow_html=True)
                             with tc_del:
-                                if st.button("🗑️", key=f"td_del_{idx}", help="حذف"):
+                                if st.button("🗑️", key=f"td_del_{idx}", help="حذف", use_container_width=True):
                                     todo_sheet.delete_rows(idx + 2)
                                     get_google_data.clear()
                                     st.rerun()
@@ -418,12 +421,13 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             else:
                 st.info("اكتب مهامك لليوم في الصندوق أعلاه 👆")
 
+    # 🌟 العرض الأفقي (Grid) لنسبة إنجاز المواد والمهام التابعة لها 🌟
     st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
     st.markdown("<h3 style='color:#1e293b; margin-bottom: 20px;'>📊 نسبة الإنجاز في المواد (محاضرات ومهام)</h3>", unsafe_allow_html=True)
     
     if not df_lectures.empty:
         all_subjects = [s for s in df_lectures['Subject'].unique() if str(s).strip() != ""]
-        cols_prog = st.columns(3)
+        cols_prog = st.columns(3) # يعرض 3 مواد في كل سطر
         for i, subj in enumerate(all_subjects):
             subj_df = df_lectures[df_lectures['Subject'] == subj]
             total = len(subj_df)
@@ -432,33 +436,51 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             
             with cols_prog[i % 3]:
                 with st.expander(f"📚 {subj} | المنجز: {pct}%"):
-                    # 1. إنجاز المحاضرات والامتحانات
+                    # شريط إنجاز المحاضرات الأساسي
                     st.markdown(f"""
-                    <div style='width: 100%; background-color: #e2e8f0; border-radius: 10px; height: 8px; margin-bottom:15px; overflow:hidden;'>
-                        <div style='width: {pct}%; background-color: #10b981; height: 100%; border-radius: 10px;'></div>
+                    <div style='width: 100%; background-color: #e2e8f0; border-radius: 8px; height: 8px; margin-bottom:15px; overflow:hidden;'>
+                        <div style='width: {pct}%; background-color: #10b981; height: 100%; border-radius: 8px;'></div>
                     </div>
                     """, unsafe_allow_html=True)
                     
+                    # 1. إنجاز المحاضرات حسب الامتحان (عرض شبكي أفقي ذكي)
                     subj_exams = [e for e in subj_df['Exam'].unique() if str(e).strip() != ""]
-                    for ex in subj_exams:
-                        ex_df = subj_df[subj_df['Exam'] == ex]
-                        if not ex_df.empty:
-                            ex_total = len(ex_df)
-                            ex_done = len(ex_df[ex_df['Status'].isin(['Done', 'Uploaded'])])
-                            c_color = "#10b981" if ex_done == ex_total else "#f59e0b" if ex_done > 0 else "#ef4444"
-                            st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.95rem; margin-top:5px; padding: 5px; background:#f8fafc; border-radius:5px;'><span>{ex}</span><span style='color:{c_color}; font-weight:bold;'>{ex_done} / {ex_total}</span></div>", unsafe_allow_html=True)
+                    if subj_exams:
+                        exam_html = "<div style='display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;'>"
+                        for ex in subj_exams:
+                            ex_df = subj_df[subj_df['Exam'] == ex]
+                            if not ex_df.empty:
+                                ex_total = len(ex_df)
+                                ex_done = len(ex_df[ex_df['Status'].isin(['Done', 'Uploaded'])])
+                                c_color = "#10b981" if ex_done == ex_total else "#f59e0b" if ex_done > 0 else "#ef4444"
+                                exam_html += f"""
+                                <div style='flex: 1 1 45%; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center;'>
+                                    <div style='font-size: 0.8rem; color: #64748b; font-weight: bold;'>{ex}</div>
+                                    <div style='font-size: 1rem; color: {c_color}; font-weight: 800;'>{ex_done}/{ex_total}</div>
+                                </div>
+                                """
+                        exam_html += "</div>"
+                        st.markdown(exam_html, unsafe_allow_html=True)
                     
-                    # 2. إنجاز المهام التابعة للمادة 
+                    # 2. إنجاز المهام التابعة للمادة (عرض شبكي أفقي ذكي)
                     subj_tasks = df_tasks[df_tasks['Subject'] == subj] if not df_tasks.empty else pd.DataFrame()
                     if not subj_tasks.empty:
-                        st.markdown("<div style='margin-top:12px; padding-top:10px; border-top:1px dashed #cbd5e1; font-weight:bold; color:#475569; font-size:0.9rem;'>🎯 إنجاز مهام المادة:</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='font-weight:bold; color:#475569; font-size:0.85rem; margin-bottom:8px;'>🎯 مهام المادة:</div>", unsafe_allow_html=True)
                         task_types = subj_tasks['Task Type'].unique()
+                        task_html = "<div style='display: flex; flex-wrap: wrap; gap: 8px;'>"
                         for t_type in task_types:
                             t_df = subj_tasks[subj_tasks['Task Type'] == t_type]
                             t_total = len(t_df)
                             t_done = len(t_df[t_df['Status'] == 'Done'])
                             t_color = "#10b981" if t_done == t_total else "#f59e0b" if t_done > 0 else "#ef4444"
-                            st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.85rem; margin-top:3px; padding: 4px; background:#f0fdf4; border-radius:4px;'><span>{t_type}</span><span style='color:{t_color}; font-weight:bold;'>{t_done} / {t_total}</span></div>", unsafe_allow_html=True)
+                            task_html += f"""
+                            <div style='flex: 1 1 45%; background: #f0fdf4; padding: 6px; border-radius: 6px; border: 1px solid #bbf7d0; text-align: center;'>
+                                <div style='font-size: 0.75rem; color: #166534; font-weight: bold;'>{t_type}</div>
+                                <div style='font-size: 0.95rem; color: {t_color}; font-weight: 800;'>{t_done}/{t_total}</div>
+                            </div>
+                            """
+                        task_html += "</div>"
+                        st.markdown(task_html, unsafe_allow_html=True)
 
 else:
     df_display = df_lectures[df_lectures['Subject'] == selected_subject]
@@ -481,7 +503,7 @@ else:
                 if new_lec_exam == "➕ امتحان جديد (كتابة يدوية)...":
                     custom_exam_name = st.text_input("اكتب اسم الامتحان (مثال: Quiz 1, OSPE)")
                 
-                if st.form_submit_button("حفظ المحاضرة"):
+                if st.form_submit_button("حفظ المحاضرة", use_container_width=True):
                     final_exam_name = custom_exam_name if new_lec_exam == "➕ امتحان جديد (كتابة يدوية)..." else new_lec_exam
                     if new_lec_title and final_exam_name:
                         new_row = []
@@ -529,7 +551,7 @@ else:
                         with st.popover("📅 تعيين تاريخ الامتحان", use_container_width=True):
                             with st.form(f"date_form_{exam_key}"):
                                 new_date = st.date_input("اختر تاريخ الامتحان")
-                                if st.form_submit_button("حفظ التاريخ"):
+                                if st.form_submit_button("حفظ التاريخ", use_container_width=True):
                                     if exams_sheet is None:
                                         st.warning("هناك مشكلة في إنشاء ورقة 'Exam Dates' في جوجل شيت.")
                                     else:
@@ -624,7 +646,7 @@ else:
                                 with st.form(f"edit_task_{idx}"):
                                     new_name = st.text_input("الاسم", value=t_row['Task Name'])
                                     new_note = st.text_area("الملاحظة", value=str(t_row.get('Note', '')))
-                                    if st.form_submit_button("حفظ"):
+                                    if st.form_submit_button("حفظ", use_container_width=True):
                                         tasks_sheet.update_cell(idx + 2, 3, new_name)
                                         tasks_sheet.update_cell(idx + 2, 5, new_note) 
                                         get_google_data.clear()
@@ -635,7 +657,7 @@ else:
                         with st.expander(f"📦 المنجزة ({len(completed)})"):
                             for idx, t_row in completed.iterrows():
                                 st.markdown(f"<div style='text-align:right;'><span style='text-decoration: line-through; color:#94a3b8;'>{t_row['Task Name']}</span></div>", unsafe_allow_html=True)
-                                if st.button("↩️ تراجع", key=f"undo_{idx}"):
+                                if st.button("↩️ تراجع", key=f"undo_{idx}", use_container_width=True):
                                     tasks_sheet.update_cell(idx + 2, 4, 'Pending')
                                     get_google_data.clear()
                                     st.rerun()
@@ -644,7 +666,7 @@ else:
                         with st.form(f"add_{task_type}"):
                             t_name = st.text_input("الاسم")
                             t_note = st.text_area("ملاحظات (اختياري)")
-                            if st.form_submit_button("حفظ إضافة") and t_name:
+                            if st.form_submit_button("حفظ إضافة", use_container_width=True) and t_name:
                                 tasks_sheet.append_row([selected_subject, task_type, t_name, 'Pending', t_note])
                                 get_google_data.clear()
                                 st.rerun()
