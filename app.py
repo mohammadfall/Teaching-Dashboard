@@ -5,14 +5,13 @@ from google.oauth2.service_account import Credentials
 import plotly.express as px
 from datetime import datetime, timedelta
 import json
-import urllib.parse
 
 # ==========================================
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - تصميم آمن، متوافق كلياً مع الموبايل (Responsive) وعرضي للمنجزات
+# CSS - تصميم آمن، واجهة امتحانات محسنة، وتنسيق نظيف
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -75,16 +74,15 @@ st.markdown("""
     
     div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
         padding: 8px !important;
+        border-radius: 12px;
     }
     
-    /* 📱 تحسينات مخصصة للهواتف الذكية 📱 */
+    /* 📱 تحسينات الموبايل */
     @media (max-width: 768px) {
         .profile-box { padding: 15px 10px; }
         h1 { font-size: 1.5rem !important; }
         h2 { font-size: 1.3rem !important; }
         h3 { font-size: 1.1rem !important; }
-        div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] { padding: 5px !important; }
-        .stButton button { width: 100% !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -231,7 +229,7 @@ with st.sidebar:
         subjects = ["🏠 الصفحة الرئيسية"] + list(df_lectures['Subject'].unique())
         selected_subject = st.radio("القائمة:", subjects, label_visibility="collapsed")
 
-# إعدادات الألوان
+# إعدادات الألوان للامتحانات
 status_map = {
     'Done': {'icon': '✅', 'color': '#10b981', 'bg': '#ecfdf5', 'label': 'منجزة'},
     'In Progress': {'icon': '⏳', 'color': '#f59e0b', 'bg': '#fffbeb', 'label': 'قيد العمل'},
@@ -239,13 +237,13 @@ status_map = {
     'Not Started': {'icon': '🔴', 'color': '#64748b', 'bg': '#f8fafc', 'label': 'لم تبدأ'}
 }
 exam_colors = {
-    "First": ("#ecfdf5", "#10b981", "#064e3b"), 
-    "Second": ("#f5f3ff", "#8b5cf6", "#4c1d95"),
-    "Mid": ("#fffbeb", "#f59e0b", "#78350f"), 
-    "Final": ("#eff6ff", "#3b82f6", "#1e3a8a"), 
-    "Unassigned": ("#f8fafc", "#64748b", "#334155")
+    "First": ("#f0fdf4", "#86efac", "#166534"), 
+    "Second": ("#fdf4ff", "#d8b4fe", "#701a75"),
+    "Mid": ("#fffbeb", "#fde68a", "#92400e"), 
+    "Final": ("#eff6ff", "#bfdbfe", "#1e3a8a"), 
+    "Unassigned": ("#f8fafc", "#e2e8f0", "#334155")
 }
-default_exam_color = ("#f8fafc", "#94a3b8", "#334155") 
+default_exam_color = ("#f8fafc", "#cbd5e1", "#334155") 
 
 # ==========================================
 # 4. التوجيه (Routing)
@@ -254,7 +252,6 @@ default_exam_color = ("#f8fafc", "#94a3b8", "#334155")
 if selected_subject == "🏠 الصفحة الرئيسية":
     st.markdown("<h2>🏠 لوحة القيادة (Overview)</h2>", unsafe_allow_html=True)
     
-    # قسم الامتحانات القادمة (العد التنازلي)
     if not df_exams.empty:
         upcoming_exams = []
         for _, r in df_exams.iterrows():
@@ -302,7 +299,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             for _, ev in tomorrow_events.iterrows():
                 st.warning(f"🚨 **تذكير وجاهي غداً!** لديك موعد: {ev.get('Subject')} الساعة {format_to_12hr(ev.get('Time'))}", icon="📅")
     
-    col1, col2 = st.columns([1, 1]) # جعل الأعمدة متساوية لتحسين العرض على الموبايل
+    col1, col2 = st.columns([1, 1.2])
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
@@ -310,7 +307,6 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         with st.container(height=500, border=False):
             if cal_sheet is not None:
                 with st.expander("⚙️ إضافة أو إدارة المواعيد"):
-                    st.markdown("**➕ إضافة موعد جديد:**")
                     with st.form("add_cal_form_home", clear_on_submit=True):
                         c_date = st.date_input("التاريخ")
                         c_time = st.time_input("الوقت")
@@ -335,11 +331,11 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                                     e_note = st.text_area("ملاحظات", value=str(row.get('Note', '')))
                                     
                                     c_save, c_del = st.columns(2)
-                                    if c_save.form_submit_button("💾 حفظ التعديل", use_container_width=True):
+                                    if c_save.form_submit_button("💾 حفظ", use_container_width=True):
                                         cal_sheet.update(range_name=f'A{idx+2}:D{idx+2}', values=[[e_date, e_time, e_sub, e_note]])
                                         get_google_data.clear()
                                         st.rerun()
-                                    if c_del.form_submit_button("🗑️ حذف الموعد", use_container_width=True):
+                                    if c_del.form_submit_button("🗑️ حذف", use_container_width=True):
                                         cal_sheet.delete_rows(idx + 2)
                                         get_google_data.clear()
                                         st.rerun()
@@ -354,7 +350,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                         note_val = str(row.get('Note', '')).strip()
                         
                         with st.container(border=True):
-                            cc_btn, cc_text = st.columns([1, 4], vertical_alignment="center")
+                            cc_btn, cc_text = st.columns([1.5, 4], vertical_alignment="center")
                             with cc_btn:
                                 if st.button("✅ إنجاز", key=f"done_cal_{idx}", use_container_width=True):
                                     cal_sheet.update_cell(idx + 2, 5, 'Done') 
@@ -370,7 +366,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                 st.info("لا توجد مواعيد وجاهية قادمة.")
 
     with col2:
-        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 مهام اليوم (To-Do List)</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 خطة اليوم (Daily To-Do)</h3>", unsafe_allow_html=True)
         
         with st.form("todo_add_form", clear_on_submit=True):
             st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#475569; margin-bottom:5px;'>ماذا ستنجز اليوم؟</div>", unsafe_allow_html=True)
@@ -398,9 +394,10 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                 if not pending_todo.empty:
                     for idx, row in pending_todo.iterrows():
                         with st.container(border=True):
-                            tc_btn, tc_text, tc_del = st.columns([1.5, 6, 1.5], vertical_alignment="center")
+                            tc_btn, tc_text, tc_del = st.columns([2.5, 6, 1.5], vertical_alignment="center")
                             with tc_btn:
-                                if st.button("⬜", key=f"td_done_{idx}", help="تم الإنجاز", use_container_width=True):
+                                # 🌟 التعديل: إرجاع زر الإنجاز الأصلي الواضح
+                                if st.button("✅ إنجاز", key=f"td_done_{idx}", help="تم الإنجاز", use_container_width=True):
                                     todo_sheet.update_cell(idx + 2, 2, 'Done')
                                     if not df_tasks.empty:
                                         for t_idx, t_row in df_tasks.iterrows():
@@ -421,13 +418,13 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             else:
                 st.info("اكتب مهامك لليوم في الصندوق أعلاه 👆")
 
-    # 🌟 العرض الأفقي (Grid) لنسبة إنجاز المواد والمهام التابعة لها 🌟
     st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
     st.markdown("<h3 style='color:#1e293b; margin-bottom: 20px;'>📊 نسبة الإنجاز في المواد (محاضرات ومهام)</h3>", unsafe_allow_html=True)
     
+    # 🌟 التعديل الجذري لمنع تسرب الـ HTML وتنسيق الشبكة 🌟
     if not df_lectures.empty:
         all_subjects = [s for s in df_lectures['Subject'].unique() if str(s).strip() != ""]
-        cols_prog = st.columns(3) # يعرض 3 مواد في كل سطر
+        cols_prog = st.columns(3) 
         for i, subj in enumerate(all_subjects):
             subj_df = df_lectures[df_lectures['Subject'] == subj]
             total = len(subj_df)
@@ -436,16 +433,15 @@ if selected_subject == "🏠 الصفحة الرئيسية":
             
             with cols_prog[i % 3]:
                 with st.expander(f"📚 {subj} | المنجز: {pct}%"):
-                    # شريط إنجاز المحاضرات الأساسي
                     st.markdown(f"""
                     <div style='width: 100%; background-color: #e2e8f0; border-radius: 8px; height: 8px; margin-bottom:15px; overflow:hidden;'>
                         <div style='width: {pct}%; background-color: #10b981; height: 100%; border-radius: 8px;'></div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 1. إنجاز المحاضرات حسب الامتحان (عرض شبكي أفقي ذكي)
                     subj_exams = [e for e in subj_df['Exam'].unique() if str(e).strip() != ""]
                     if subj_exams:
+                        # كتابة الكود بسطر واحد لمنع الـ Markdown من اعتباره كود بلوك
                         exam_html = "<div style='display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;'>"
                         for ex in subj_exams:
                             ex_df = subj_df[subj_df['Exam'] == ex]
@@ -453,16 +449,10 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                                 ex_total = len(ex_df)
                                 ex_done = len(ex_df[ex_df['Status'].isin(['Done', 'Uploaded'])])
                                 c_color = "#10b981" if ex_done == ex_total else "#f59e0b" if ex_done > 0 else "#ef4444"
-                                exam_html += f"""
-                                <div style='flex: 1 1 45%; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center;'>
-                                    <div style='font-size: 0.8rem; color: #64748b; font-weight: bold;'>{ex}</div>
-                                    <div style='font-size: 1rem; color: {c_color}; font-weight: 800;'>{ex_done}/{ex_total}</div>
-                                </div>
-                                """
+                                exam_html += f"<div style='flex: 1 1 45%; background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #e2e8f0; text-align: center;'><div style='font-size: 0.8rem; color: #64748b; font-weight: bold;'>{ex}</div><div style='font-size: 1rem; color: {c_color}; font-weight: 800;'>{ex_done}/{ex_total}</div></div>"
                         exam_html += "</div>"
                         st.markdown(exam_html, unsafe_allow_html=True)
                     
-                    # 2. إنجاز المهام التابعة للمادة (عرض شبكي أفقي ذكي)
                     subj_tasks = df_tasks[df_tasks['Subject'] == subj] if not df_tasks.empty else pd.DataFrame()
                     if not subj_tasks.empty:
                         st.markdown("<div style='font-weight:bold; color:#475569; font-size:0.85rem; margin-bottom:8px;'>🎯 مهام المادة:</div>", unsafe_allow_html=True)
@@ -473,12 +463,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                             t_total = len(t_df)
                             t_done = len(t_df[t_df['Status'] == 'Done'])
                             t_color = "#10b981" if t_done == t_total else "#f59e0b" if t_done > 0 else "#ef4444"
-                            task_html += f"""
-                            <div style='flex: 1 1 45%; background: #f0fdf4; padding: 6px; border-radius: 6px; border: 1px solid #bbf7d0; text-align: center;'>
-                                <div style='font-size: 0.75rem; color: #166534; font-weight: bold;'>{t_type}</div>
-                                <div style='font-size: 0.95rem; color: {t_color}; font-weight: 800;'>{t_done}/{t_total}</div>
-                            </div>
-                            """
+                            task_html += f"<div style='flex: 1 1 45%; background: #f0fdf4; padding: 6px; border-radius: 6px; border: 1px solid #bbf7d0; text-align: center;'><div style='font-size: 0.75rem; color: #166534; font-weight: bold;'>{t_type}</div><div style='font-size: 0.95rem; color: {t_color}; font-weight: 800;'>{t_done}/{t_total}</div></div>"
                         task_html += "</div>"
                         st.markdown(task_html, unsafe_allow_html=True)
 
@@ -537,8 +522,14 @@ else:
             for col, exam_key in zip(cols, chunk):
                 with col:
                     with st.container(border=True):
+                        # 🌟 التعديل الجذري: خلفية وترويسة احترافية جداً للامتحانات 🌟
                         bg_color, border_color, text_color = exam_colors.get(exam_key, default_exam_color)
-                        st.markdown(f"<div style='background-color:{bg_color}; padding:10px; border-radius:8px; border-bottom:4px solid {border_color}; text-align:center; margin-bottom:15px;'><h4 style='margin:0; color:{text_color};'>{exam_key}</h4></div>", unsafe_allow_html=True)
+                        
+                        st.markdown(f"""
+                        <div style='background-color:{bg_color}; border: 2px solid {border_color}; padding:20px; border-radius:12px; text-align:center; margin-bottom:15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
+                            <h3 style='margin:0; color:{text_color}; font-weight:900; font-size: 1.5rem;'>{exam_key}</h3>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         exam_date_str = ""
                         row_idx_in_e = -1
@@ -548,12 +539,12 @@ else:
                                 exam_date_str = str(match_date.iloc[0]['Date']).strip()
                                 row_idx_in_e = match_date.index[0]
                         
-                        with st.popover("📅 تعيين تاريخ الامتحان", use_container_width=True):
+                        with st.popover("📅 ضبط تاريخ الامتحان", use_container_width=True):
                             with st.form(f"date_form_{exam_key}"):
                                 new_date = st.date_input("اختر تاريخ الامتحان")
                                 if st.form_submit_button("حفظ التاريخ", use_container_width=True):
                                     if exams_sheet is None:
-                                        st.warning("هناك مشكلة في إنشاء ورقة 'Exam Dates' في جوجل شيت.")
+                                        st.warning("هناك مشكلة في إنشاء ورقة 'Exam Dates'.")
                                     else:
                                         if row_idx_in_e != -1:
                                             exams_sheet.update_cell(int(row_idx_in_e) + 2, 3, str(new_date))
@@ -567,24 +558,24 @@ else:
                                 e_date = datetime.strptime(exam_date_str, "%Y-%m-%d").date()
                                 diff = (e_date - datetime.now().date()).days
                                 if diff > 0:
-                                    st.markdown(f"<div style='background:#fffbeb; color:#d97706; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fcd34d;'>⏳ باقي {diff} يوم (التاريخ: {exam_date_str})</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='background:#fffbeb; color:#d97706; padding:12px; border-radius:8px; text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:15px; border:1px solid #fcd34d;'>⏳ باقي {diff} يوم<br><span style='font-size:0.85rem; font-weight:normal;'>{exam_date_str}</span></div>", unsafe_allow_html=True)
                                 elif diff == 0:
-                                    st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق.</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:12px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق.</div>", unsafe_allow_html=True)
                                 else:
-                                    st.markdown(f"<div style='background:#f8fafc; color:#64748b; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #e2e8f0;'>✅ انتهى الامتحان ({exam_date_str})</div>", unsafe_allow_html=True)
-                            except:
-                                pass
+                                    st.markdown(f"<div style='background:#f8fafc; color:#64748b; padding:12px; border-radius:8px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #e2e8f0;'>✅ انتهى الامتحان ({exam_date_str})</div>", unsafe_allow_html=True)
+                            except: pass
                                 
                         exam_df = df_display[df_display['Exam'] == exam_key]
                         total_e = len(exam_df)
                         done_e = len(exam_df[exam_df['Status'].isin(['Done', 'Uploaded'])])
                         not_done_df = exam_df[~exam_df['Status'].isin(['Done', 'Uploaded'])]
                         
+                        st.markdown(f"<div style='text-align:left; color:#64748b; font-size:0.9rem; font-weight:bold; margin-bottom:5px;'>الإنجاز: {done_e} / {total_e}</div>", unsafe_allow_html=True)
                         st.progress(done_e / total_e if total_e > 0 else 0)
+                        
                         if done_e == total_e and total_e > 0:
                             st.markdown(f"<div style='background:#ecfdf5; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #6ee7b7;'>🏆 جاهز 100%!</div>", unsafe_allow_html=True)
                         else:
-                            st.caption(f"📈 الإنجاز: {done_e} من {total_e}")
                             if not not_done_df.empty:
                                 with st.expander("⚠️ المحاضرات المتبقية"):
                                     for _, nd_row in not_done_df.iterrows():
@@ -592,6 +583,7 @@ else:
                                         st.markdown(f"<div style='color:#ef4444; font-size:0.9rem; margin-bottom:4px;'>🔴 {nd_title}</div>", unsafe_allow_html=True)
                         
                         st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
+                        st.markdown("<div style='font-weight:700; color:#475569; margin-bottom:10px;'>📚 المحاضرات:</div>", unsafe_allow_html=True)
 
                         for idx, row in exam_df.iterrows():
                             status_val = str(row.get('Status', 'Not Started')).strip()
