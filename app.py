@@ -5,14 +5,13 @@ from google.oauth2.service_account import Credentials
 import plotly.express as px
 from datetime import datetime, timedelta
 import json
-import urllib.parse
 
 # ==========================================
 # 1. إعدادات الصفحة
 # ==========================================
 st.set_page_config(page_title="Alomari Creator OS", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
-# CSS - آمن ومخصص للترتيب
+# CSS - آمن، مفصول، وأنيق جداً
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -27,17 +26,32 @@ st.markdown("""
     .animate-fade { animation: fadeIn 0.4s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
-    [data-testid="stExpander"] {
-        background-color: #ffffff; border-radius: 10px !important; border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 12px;
-    }
-    
-    div[role="radiogroup"] { gap: 0.3rem !important; }
+    /* تحسين وتفصيل تبويبات المواد في الشريط الجانبي */
+    div[role="radiogroup"] { gap: 10px !important; padding-top: 10px;}
     div[role="radiogroup"] > label {
-        background-color: transparent; padding: 10px 15px; border-radius: 8px; cursor: pointer; margin: 0; transition: all 0.2s;
+        background-color: #ffffff; 
+        border: 1px solid #e2e8f0; 
+        padding: 12px 15px; 
+        border-radius: 10px; 
+        cursor: pointer; 
+        margin: 0; 
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
-    div[role="radiogroup"] > label:hover { background-color: #e2e8f0; }
-    div[role="radiogroup"] > label[aria-checked="true"] { background-color: #eff6ff !important; border-right: 4px solid #3b82f6; }
+    div[role="radiogroup"] > label:hover { 
+        background-color: #f8fafc; 
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-color: #cbd5e1;
+    }
+    div[role="radiogroup"] > label[aria-checked="true"] { 
+        background: linear-gradient(90deg, #eff6ff 0%, #ffffff 100%) !important; 
+        border-right: 5px solid #2563eb;
+        border-left: 1px solid #bfdbfe;
+        border-top: 1px solid #bfdbfe;
+        border-bottom: 1px solid #bfdbfe;
+        box-shadow: 0 4px 10px rgba(37,99,235,0.1);
+    }
     div[role="radiogroup"] > label > div:first-child { display: none !important; } 
     div[role="radiogroup"] > label p { font-size: 1.05rem; font-weight: 600; margin: 0; color: #475569; }
     div[role="radiogroup"] > label[aria-checked="true"] p { color: #1e3a8a; font-weight: 800; }
@@ -50,8 +64,9 @@ st.markdown("""
     .profile-box h3 { color: white !important; font-size: 1.3rem !important; margin:0;}
     .profile-box h4 { color: #cbd5e1 !important; font-size: 1rem !important; margin-top:5px;}
     
-    button[data-baseweb="tab"][aria-selected="true"] { 
-        color: #2563eb !important; border-bottom: 3px solid #2563eb !important; background-color: #eff6ff !important; border-radius: 8px 8px 0 0;
+    [data-testid="stExpander"] {
+        background-color: #ffffff; border-radius: 10px !important; border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 12px;
     }
     
     div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -61,7 +76,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# دالة تحويل الوقت إلى نظام 12 ساعة (ص/م)
+# دالة تحويل الوقت 
 # ==========================================
 def format_to_12hr(time_str):
     if pd.isna(time_str) or str(time_str).strip() == "": return "غير محدد"
@@ -77,7 +92,6 @@ def format_to_12hr(time_str):
 @st.cache_resource(ttl=60)
 def get_google_data():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
     try:
         if "gcp_service_account" in st.secrets:
             creds_info = json.loads(st.secrets["gcp_service_account"])
@@ -85,13 +99,13 @@ def get_google_data():
         else:
             creds = Credentials.from_service_account_file("creds.json", scopes=scope)
     except Exception as e:
-        st.error(f"⚠️ مشكلة في بيانات الربط (Credentials): {e}")
+        st.error(f"⚠️ مشكلة في بيانات الربط: {e}")
         st.stop()
 
     client = gspread.authorize(creds)
     spreadsheet = client.open("Dashboard")
     
-    # 1. المحاضرات
+    # المحاضرات
     tracker_sheet = spreadsheet.worksheet("Lectures Tracker")
     records_l = tracker_sheet.get_all_records()
     df_l = pd.DataFrame(records_l) if records_l else pd.DataFrame()
@@ -99,7 +113,7 @@ def get_google_data():
         if 'Exam' not in df_l.columns: df_l['Exam'] = 'Unassigned'
         if 'Note' not in df_l.columns: df_l['Note'] = ''
         
-    # 2. التقويم
+    # التقويم
     cal_cols = ["Date", "Time", "Subject", "Note", "Status"]
     try:
         cal_sheet = spreadsheet.worksheet("Calendar")
@@ -113,7 +127,7 @@ def get_google_data():
                 if col not in df_c.columns: df_c[col] = "Pending" if col == "Status" else ""
     except: cal_sheet, df_c = None, pd.DataFrame(columns=cal_cols)
         
-    # 3. المهام
+    # المهام
     tasks_cols = ["Subject", "Task Type", "Task Name", "Status", "Note"]
     try:
         tasks_sheet = spreadsheet.worksheet("Tasks")
@@ -127,7 +141,7 @@ def get_google_data():
                 if col not in df_t.columns: df_t[col] = ""
     except: tasks_sheet, df_t = None, pd.DataFrame(columns=tasks_cols)
         
-    # 4. تواريخ الامتحانات
+    # تواريخ الامتحانات
     exams_cols = ["Subject", "Exam", "Date"]
     try:
         exams_sheet = spreadsheet.worksheet("Exam Dates")
@@ -155,7 +169,7 @@ def get_google_data():
 df_lectures, df_calendar, df_tasks, df_exams, tracker_sheet, cal_sheet, tasks_sheet, exams_sheet = get_google_data()
 
 # ==========================================
-# 3. الشريط الجانبي (Sidebar)
+# 3. الشريط الجانبي (Sidebar) - تم تنظيفه وتطويره
 # ==========================================
 with st.sidebar:
     current_hour = datetime.now().hour
@@ -175,32 +189,17 @@ with st.sidebar:
                 <b style='color:#10b981;'>{prog_global}%</b>
             </div>
             <div style='width:100%; background:#e2e8f0; height:8px; border-radius:4px;'>
-                <div style='width:{prog_global}%; background:#10b981; height:100%; border-radius:4px;'></div>
+                <div style='width:{prog_global}%; background:#10b981; height:100%; border-radius:4px; transition: width 0.5s ease-in-out;'></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("<div style='color:#64748b; font-weight:700; margin-bottom:10px; font-size:1rem;'>📂 مساحات العمل</div>", unsafe_allow_html=True)
+    st.markdown("<div style='color:#64748b; font-weight:700; margin-bottom:5px; font-size:1rem;'>📂 مساحات العمل والتبويبات</div>", unsafe_allow_html=True)
     if not df_lectures.empty:
         subjects = ["🏠 الصفحة الرئيسية"] + list(df_lectures['Subject'].unique())
         selected_subject = st.radio("القائمة:", subjects, label_visibility="collapsed")
     
-    st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
-    search_query = st.text_input("🔍 بحث سريع عن محاضرة...", "")
-    
-    email_body = "مرحباً دكتور محمد،\n\nإليك تقرير إنجازك الأسبوعي:\n\n"
-    if not df_calendar.empty:
-        email_body += "📅 المواعيد القادمة:\n"
-        for _, r in df_calendar[df_calendar['Status'] != 'Done'].iterrows():
-            email_body += f"- {r.get('Date','')} ({r.get('Time','')}): {r.get('Subject','')}\n"
-    if not df_tasks.empty:
-        email_body += "\n🎯 المهام المعلقة:\n"
-        for _, r in df_tasks[df_tasks['Status'] != 'Done'].iterrows():
-            email_body += f"- [{r.get('Subject','')}] {r.get('Task Name','')} ({r.get('Task Type','')})\n"
-    
-    mailto_link = f"mailto:ALROTHEMATICS.MOHAMMAD0@GMAIL.COM?subject={urllib.parse.quote('تذكير مهام Creator OS 🚀')}&body={urllib.parse.quote(email_body)}"
-    st.markdown(f"<a href='{mailto_link}' target='_blank' style='display:block; text-align:center; background:#2563eb; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:1rem; box-shadow: 0 4px 6px rgba(37,99,235,0.2); transition: 0.2s;'>📧 إرسال تقرير للإيميل</a>", unsafe_allow_html=True)
-
+    # تم حذف حقل البحث وزر الإيميل من هنا كما طلبت للتنظيف.
 
 # إعدادات الألوان
 status_map = {
@@ -225,44 +224,67 @@ default_exam_color = ("#f8fafc", "#94a3b8", "#334155")
 if selected_subject == "🏠 الصفحة الرئيسية":
     st.markdown("<h2>🏠 لوحة القيادة (Overview)</h2>", unsafe_allow_html=True)
     
-    # --- 🌟 القسم الجديد: الامتحانات القادمة (العد التنازلي) 🌟 ---
+    # 🌟 الميزة الجديدة كلياً: قائمة "بؤرة التركيز" (Daily To-Do List) 🌟
+    st.markdown("<h3 style='color:#1e293b; margin-top:20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 بؤرة التركيز (مهام تحتاجك اليوم)</h3>", unsafe_allow_html=True)
+    if not df_tasks.empty:
+        pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
+        if not pending_tasks.empty:
+            # نأخذ أول 5 مهام فقط للتركيز
+            focus_tasks = pending_tasks.head(5) 
+            for idx, t_row in focus_tasks.iterrows():
+                t_type = str(t_row['Task Type']).strip()
+                color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
+                
+                with st.container(border=True):
+                    fc1, fc2, fc3 = st.columns([1, 6, 2], vertical_alignment="center")
+                    with fc1:
+                        if st.button("⬜", key=f"focus_done_{idx}", help="اضغط لإنجاز المهمة"):
+                            tasks_sheet.update_cell(idx + 2, 4, 'Done') 
+                            get_google_data.clear()
+                            st.rerun()
+                    with fc2:
+                        st.markdown(f"<div style='font-size:1.1rem; font-weight:700; color:#1e293b;'>{t_row['Task Name']}</div>", unsafe_allow_html=True)
+                        if str(t_row.get('Note', '')).strip():
+                            st.caption(f"📝 {t_row['Note']}")
+                    with fc3:
+                        st.markdown(f"<div style='text-align:left;'><span style='background:{color}20; color:{color}; padding:4px 10px; border-radius:15px; font-size:0.8rem; font-weight:bold;'>{t_row['Subject']} | {t_type}</span></div>", unsafe_allow_html=True)
+        else:
+            st.success("أنت بطل! لا يوجد أي مهام معلقة في قائمتك. ☕")
+    else:
+        st.info("لم تقم بإضافة أي مهام بعد.")
+    
+    # -------------------------------------------------------------
+    # قسم الامتحانات القادمة (العد التنازلي)
     if not df_exams.empty:
         upcoming_exams = []
         for _, r in df_exams.iterrows():
             try:
                 e_date = datetime.strptime(str(r['Date']).strip(), "%Y-%m-%d").date()
                 diff = (e_date - datetime.now().date()).days
-                if diff >= 0:  # إظهار الامتحانات القادمة أو التي تصادف اليوم فقط
+                if diff >= 0:  
                     upcoming_exams.append({
                         'Subject': r['Subject'], 
                         'Exam': r['Exam'], 
                         'Days': diff, 
                         'DateStr': str(r['Date']).strip()
                     })
-            except:
-                pass
+            except: pass
                 
         if upcoming_exams:
-            st.markdown("<h3 style='color:#1e293b; margin-top:20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>⏳ الامتحانات القادمة</h3>", unsafe_allow_html=True)
-            # ترتيب من الأقرب للأبعد
+            st.markdown("<h3 style='color:#1e293b; margin-top:30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>⏳ الامتحانات القادمة</h3>", unsafe_allow_html=True)
             upcoming_exams = sorted(upcoming_exams, key=lambda x: x['Days'])
-            cols_ex = st.columns(min(len(upcoming_exams), 4)) # عرض 4 امتحانات كحد أقصى في الصف الأول
+            cols_ex = st.columns(min(len(upcoming_exams), 4)) 
             
             for i, ex in enumerate(upcoming_exams[:4]):
                 with cols_ex[i]:
-                    # تحديد الألوان بناءً على قرب الموعد
                     if ex['Days'] == 0:
-                        color_bg, color_text = "#fef2f2", "#ef4444"
-                        days_text = "اليوم!"
+                        color_bg, color_text, days_text = "#fef2f2", "#ef4444", "اليوم!"
                     elif ex['Days'] <= 3:
-                        color_bg, color_text = "#fef2f2", "#ef4444"
-                        days_text = f"باقي {ex['Days']} أيام"
+                        color_bg, color_text, days_text = "#fef2f2", "#ef4444", f"باقي {ex['Days']} أيام"
                     elif ex['Days'] <= 7:
-                        color_bg, color_text = "#fffbeb", "#d97706"
-                        days_text = f"باقي {ex['Days']} يوم"
+                        color_bg, color_text, days_text = "#fffbeb", "#d97706", f"باقي {ex['Days']} يوم"
                     else:
-                        color_bg, color_text = "#f0fdf4", "#10b981"
-                        days_text = f"باقي {ex['Days']} يوم"
+                        color_bg, color_text, days_text = "#f0fdf4", "#10b981", f"باقي {ex['Days']} يوم"
                         
                     st.markdown(f"""
                     <div style='background:{color_bg}; border:1px solid {color_text}40; padding:15px; border-radius:10px; text-align:center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom:20px;'>
@@ -274,19 +296,12 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                     """, unsafe_allow_html=True)
     # -------------------------------------------------------------
     
-    if not df_calendar.empty:
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-        tomorrow_events = df_calendar[(df_calendar['Date'] == tomorrow) & (df_calendar['Status'] != 'Done')]
-        if not tomorrow_events.empty:
-            for _, ev in tomorrow_events.iterrows():
-                st.warning(f"🚨 **تذكير وجاهي غداً!** لديك موعد: {ev.get('Subject')} الساعة {format_to_12hr(ev.get('Time'))}", icon="📅")
-    
     col1, col2 = st.columns([1.2, 1])
     
     with col1:
         st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🗓️ الجدول والمواعيد</h3>", unsafe_allow_html=True)
         
-        with st.container(height=550, border=False):
+        with st.container(height=500, border=False):
             if cal_sheet is not None:
                 with st.expander("⚙️ إضافة أو إدارة المواعيد"):
                     st.markdown("**➕ إضافة موعد جديد:**")
@@ -349,11 +364,11 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                 st.info("لا توجد مواعيد وجاهية قادمة.")
 
     with col2:
-        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 مهام هذا الأسبوع</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>📋 الأرشيف والمهام المتبقية</h3>", unsafe_allow_html=True)
         if df_tasks is not None and not df_tasks.empty:
             pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
             if not pending_tasks.empty:
-                with st.container(height=550, border=False):
+                with st.container(height=500, border=False):
                     grouped_tasks = pending_tasks.groupby('Subject')
                     for subj, group in grouped_tasks:
                         st.markdown(f"""
@@ -373,7 +388,7 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                                 tc_btn, tc_badge, tc_text = st.columns([2.5, 2, 6], vertical_alignment="center")
                                 
                                 with tc_btn:
-                                    if st.button("✅ إنجاز", key=f"home_done_{idx}", use_container_width=True):
+                                    if st.button("✅ إنجاز", key=f"home_done2_{idx}", use_container_width=True):
                                         tasks_sheet.update_cell(idx + 2, 4, 'Done') 
                                         get_google_data.clear()
                                         st.rerun()
@@ -389,40 +404,8 @@ if selected_subject == "🏠 الصفحة الرئيسية":
         else:
             st.info("لا توجد مهام إضافية مسجلة.")
 
-    st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color:#1e293b; margin-bottom: 20px;'>📊 نسبة الإنجاز في المواد</h3>", unsafe_allow_html=True)
-    
-    if not df_lectures.empty:
-        all_subjects = [s for s in df_lectures['Subject'].unique() if str(s).strip() != ""]
-        cols_prog = st.columns(3)
-        for i, subj in enumerate(all_subjects):
-            subj_df = df_lectures[df_lectures['Subject'] == subj]
-            total = len(subj_df)
-            done = len(subj_df[subj_df['Status'].isin(['Done', 'Uploaded'])])
-            pct = int((done / total) * 100) if total > 0 else 0
-            
-            with cols_prog[i % 3]:
-                with st.expander(f"📚 {subj} | المنجز: {pct}%"):
-                    st.markdown(f"""
-                    <div style='width: 100%; background-color: #e2e8f0; border-radius: 10px; height: 8px; margin-bottom:15px; overflow:hidden;'>
-                        <div style='width: {pct}%; background-color: #10b981; height: 100%; border-radius: 10px;'></div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    subj_exams = [e for e in subj_df['Exam'].unique() if str(e).strip() != ""]
-                    for ex in subj_exams:
-                        ex_df = subj_df[subj_df['Exam'] == ex]
-                        if not ex_df.empty:
-                            ex_total = len(ex_df)
-                            ex_done = len(ex_df[ex_df['Status'].isin(['Done', 'Uploaded'])])
-                            c_color = "#10b981" if ex_done == ex_total else "#f59e0b" if ex_done > 0 else "#ef4444"
-                            st.markdown(f"<div style='display:flex; justify-content:space-between; font-size:0.95rem; margin-top:5px; padding: 5px; background:#f8fafc; border-radius:5px;'><span>{ex}</span><span style='color:{c_color}; font-weight:bold;'>{ex_done} / {ex_total}</span></div>", unsafe_allow_html=True)
-
 else:
     df_display = df_lectures[df_lectures['Subject'] == selected_subject]
-    if search_query:
-        t_col = 'Lecture Title' if 'Lecture Title' in df_display.columns else 'Title'
-        df_display = df_display[df_display[t_col].astype(str).str.contains(search_query, case=False, na=False)]
 
     cc_title, cc_add = st.columns([3, 1], vertical_alignment="center")
     with cc_title:
@@ -508,7 +491,7 @@ else:
                                 if diff > 0:
                                     st.markdown(f"<div style='background:#fffbeb; color:#d97706; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fcd34d;'>⏳ باقي {diff} يوم (التاريخ: {exam_date_str})</div>", unsafe_allow_html=True)
                                 elif diff == 0:
-                                    st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق يا دكتور.</div>", unsafe_allow_html=True)
+                                    st.markdown(f"<div style='background:#fef2f2; color:#ef4444; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #fca5a5;'>🚨 الامتحان اليوم! بالتوفيق.</div>", unsafe_allow_html=True)
                                 else:
                                     st.markdown(f"<div style='background:#f8fafc; color:#64748b; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:10px; border:1px solid #e2e8f0;'>✅ انتهى الامتحان ({exam_date_str})</div>", unsafe_allow_html=True)
                             except:
@@ -521,11 +504,11 @@ else:
                         
                         st.progress(done_e / total_e if total_e > 0 else 0)
                         if done_e == total_e and total_e > 0:
-                            st.markdown(f"<div style='background:#ecfdf5; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #6ee7b7;'>🏆 أنت جاهز 100% للامتحان!</div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background:#ecfdf5; color:#10b981; padding:8px; border-radius:6px; text-align:center; font-weight:bold; margin-bottom:15px; border:1px solid #6ee7b7;'>🏆 جاهز 100%!</div>", unsafe_allow_html=True)
                         else:
-                            st.caption(f"📈 الإنجاز: {done_e} من {total_e} محاضرات")
+                            st.caption(f"📈 الإنجاز: {done_e} من {total_e}")
                             if not not_done_df.empty:
-                                with st.expander("⚠️ المحاضرات المتبقية للامتحان"):
+                                with st.expander("⚠️ المحاضرات المتبقية"):
                                     for _, nd_row in not_done_df.iterrows():
                                         nd_title = nd_row.get('Lecture Title', nd_row.get('Title', ''))
                                         st.markdown(f"<div style='color:#ef4444; font-size:0.9rem; margin-bottom:4px;'>🔴 {nd_title}</div>", unsafe_allow_html=True)
@@ -533,14 +516,10 @@ else:
                         st.markdown("<hr style='margin:15px 0;'>", unsafe_allow_html=True)
 
                         for idx, row in exam_df.iterrows():
-                            # --- 🛡️ حماية فولاذية للحالة لتجنب الـ ValueError 🛡️ ---
                             status_val = str(row.get('Status', 'Not Started')).strip()
                             if status_val == 'Uploaded' or status_val == '': 
                                 status_val = 'Done' if status_val == 'Uploaded' else 'Not Started'
-                            
-                            if status_val not in status_map: 
-                                status_val = 'Not Started'
-                            # ----------------------------------------------------
+                            if status_val not in status_map: status_val = 'Not Started'
 
                             st_info = status_map.get(status_val, status_map['Not Started'])
                             l_title = row.get('Lecture Title', row.get('Title', 'بدون عنوان'))
