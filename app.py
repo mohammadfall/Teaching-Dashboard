@@ -30,7 +30,7 @@ st.markdown("""
     /* 🌟 توحيد أحجام التبويبات في الشريط الجانبي 🌟 */
     div[role="radiogroup"] { gap: 10px !important; padding-top: 10px;}
     div[role="radiogroup"] > label {
-        width: 100%; /* يجعل الأزرار كلها بنفس العرض */
+        width: 100%; 
         display: block; 
         background-color: #ffffff; 
         border: 1px solid #e2e8f0; 
@@ -164,9 +164,32 @@ def get_google_data():
         except: df_e = pd.DataFrame(columns=exams_cols)
     else: df_e = pd.DataFrame(columns=exams_cols)
 
-    return df_l, df_c, df_t, df_e, tracker_sheet, cal_sheet, tasks_sheet, exams_sheet
+    # 🌟 إنشاء ورقة مهام اليوم (Daily ToDo) 🌟
+    todo_cols = ["Task Name", "Status", "Date"]
+    try:
+        todo_sheet = spreadsheet.worksheet("Daily ToDo")
+    except:
+        try:
+            todo_sheet = spreadsheet.add_worksheet(title="Daily ToDo", rows="100", cols="3")
+            todo_sheet.update(range_name='A1', values=[todo_cols])
+        except: todo_sheet = None
+        
+    if todo_sheet is not None:
+        try:
+            td_recs = todo_sheet.get_all_records()
+            if not td_recs:
+                df_todo = pd.DataFrame(columns=todo_cols)
+                if len(todo_sheet.get_all_values()) == 0: todo_sheet.update(range_name='A1', values=[todo_cols])
+            else:
+                df_todo = pd.DataFrame(td_recs)
+                for col in todo_cols:
+                    if col not in df_todo.columns: df_todo[col] = ""
+        except: df_todo = pd.DataFrame(columns=todo_cols)
+    else: df_todo = pd.DataFrame(columns=todo_cols)
 
-df_lectures, df_calendar, df_tasks, df_exams, tracker_sheet, cal_sheet, tasks_sheet, exams_sheet = get_google_data()
+    return df_l, df_c, df_t, df_e, df_todo, tracker_sheet, cal_sheet, tasks_sheet, exams_sheet, todo_sheet
+
+df_lectures, df_calendar, df_tasks, df_exams, df_todo, tracker_sheet, cal_sheet, tasks_sheet, exams_sheet, todo_sheet = get_google_data()
 
 # ==========================================
 # 3. الشريط الجانبي (Sidebar)
@@ -338,43 +361,63 @@ if selected_subject == "🏠 الصفحة الرئيسية":
                 st.info("لا توجد مواعيد وجاهية قادمة.")
 
     with col2:
-        # 🌟 التصميم الجديد للمهام: To-Do List مجمعة ومرتبة 🌟
-        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 المهام المعلقة (To-Do List)</h3>", unsafe_allow_html=True)
-        if df_tasks is not None and not df_tasks.empty:
-            pending_tasks = df_tasks[df_tasks['Status'] != 'Done']
-            if not pending_tasks.empty:
-                with st.container(height=500, border=False):
-                    grouped_tasks = pending_tasks.groupby('Subject')
-                    for subj, group in grouped_tasks:
-                        # ترويسة بسيطة للمادة بدلاً من البلوكات الضخمة
-                        st.markdown(f"<div style='margin-top:15px; margin-bottom:5px; font-weight:800; color:#475569; font-size:1.05rem;'>📚 {subj}</div>", unsafe_allow_html=True)
-                        
-                        for idx, t_row in group.iterrows():
-                            t_type = str(t_row['Task Type']).strip()
-                            color = "#f59e0b" if t_type == 'مراجعة' else "#8b5cf6" if t_type == 'ملخص' else "#10b981"
-                            note_val = str(t_row.get('Note', '')).strip()
-                            
-                            with st.container(border=True):
-                                tc_btn, tc_text, tc_badge = st.columns([1.5, 6, 2.5], vertical_alignment="center")
-                                
-                                with tc_btn:
-                                    if st.button("✅ إنجاز", key=f"todo_done_{idx}", use_container_width=True):
-                                        tasks_sheet.update_cell(idx + 2, 4, 'Done') 
-                                        get_google_data.clear()
-                                        st.rerun()
-                                        
-                                with tc_text:
-                                    note_html = f"<div style='color: #64748b; font-size: 0.8rem; margin-top: 2px;'>📝 {note_val}</div>" if note_val else ""
-                                    st.markdown(f"<div style='text-align: right; font-weight: 700; color: #1e293b; font-size: 1.05rem;'>{t_row['Task Name']}{note_html}</div>", unsafe_allow_html=True)
-                                
-                                with tc_badge:
-                                    st.markdown(f"<div style='text-align: left;'><span style='background:{color}15; color:{color}; padding:4px 10px; border-radius:15px; font-size:0.8rem; font-weight:bold; border: 1px solid {color}30;'>{t_type}</span></div>", unsafe_allow_html=True)
+        # 🌟 التصميم الجديد: بؤرة التركيز التفاعلية (To-Do List اليومية) 🌟
+        st.markdown("<h3 style='color:#1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>🎯 خطة اليوم (Daily To-Do)</h3>", unsafe_allow_html=True)
+        
+        # 1. إضافة مهمة جديدة لليوم (بالكتابة أو بالاختيار)
+        with st.form("todo_add_form", clear_on_submit=True):
+            st.markdown("<div style='font-size:0.9rem; font-weight:bold; color:#475569; margin-bottom:5px;'>ماذا ستنجز اليوم؟</div>", unsafe_allow_html=True)
+            
+            # جلب المهام المسجلة مسبقاً لعرضها كخيارات
+            existing_tasks_list = ["-- اكتب مهمة جديدة أو اختر من القائمة --"]
+            if not df_tasks.empty:
+                pending_t = df_tasks[df_tasks['Status'] != 'Done']
+                for _, r in pending_t.iterrows():
+                    existing_tasks_list.append(f"{r['Task Name']} ({r['Subject']} - {r['Task Type']})")
+            
+            c_sel, c_txt = st.columns([1, 1])
+            selected_existing = c_sel.selectbox("اختر من المهام المتراكمة:", existing_tasks_list, label_visibility="collapsed")
+            custom_task = c_txt.text_input("أو اكتب مهمة جديدة حرة:", placeholder="مثال: مراجعة سريعة، شراء قهوة...", label_visibility="collapsed")
+            
+            if st.form_submit_button("إضافة للقائمة ➕", use_container_width=True):
+                task_to_add = custom_task.strip() if custom_task.strip() else (selected_existing if selected_existing != "-- اكتب مهمة جديدة أو اختر من القائمة --" else "")
+                if task_to_add:
+                    if todo_sheet is not None:
+                        todo_sheet.append_row([task_to_add, "Pending", str(datetime.now().date())])
+                        get_google_data.clear()
+                        st.rerun()
+        
+        # 2. عرض مهام اليوم
+        with st.container(height=350, border=False):
+            if not df_todo.empty:
+                pending_todo = df_todo[df_todo['Status'] != 'Done']
+                if not pending_todo.empty:
+                    for idx, row in pending_todo.iterrows():
+                        with st.container(border=True):
+                            tc_btn, tc_text, tc_del = st.columns([1.5, 7, 1.5], vertical_alignment="center")
+                            with tc_btn:
+                                if st.button("⬜", key=f"td_done_{idx}", help="تم الإنجاز"):
+                                    todo_sheet.update_cell(idx + 2, 2, 'Done')
+                                    # التحديث التلقائي للمهمة الأصلية إذا كانت مختارة من القائمة
+                                    if not df_tasks.empty:
+                                        for t_idx, t_row in df_tasks.iterrows():
+                                            if f"{t_row['Task Name']} ({t_row['Subject']} - {t_row['Task Type']})" == row['Task Name']:
+                                                tasks_sheet.update_cell(t_idx + 2, 4, 'Done')
+                                                break
+                                    get_google_data.clear()
+                                    st.rerun()
+                            with tc_text:
+                                st.markdown(f"<div style='font-size:1.05rem; font-weight:700; color:#1e293b;'>{row['Task Name']}</div>", unsafe_allow_html=True)
+                            with tc_del:
+                                if st.button("🗑️", key=f"td_del_{idx}", help="حذف"):
+                                    todo_sheet.delete_rows(idx + 2)
+                                    get_google_data.clear()
+                                    st.rerun()
+                else:
+                    st.success("لقد أنهيت جميع مهام اليوم! يوم مثمر بامتياز ☕")
             else:
-                st.success("لقد أنجزت كل المهام المعلقة. بطل! 🔥")
-        else:
-            st.info("لا توجد مهام إضافية مسجلة.")
+                st.info("اكتب مهامك لليوم في الصندوق أعلاه 👆")
 
-    # 🌟 إرجاع وتطوير قسم "نسبة الإنجاز" ليشمل تفاصيل المهام لكل مادة 🌟
     st.markdown("<hr style='border: 1px dashed #cbd5e1; margin: 30px 0;'>", unsafe_allow_html=True)
     st.markdown("<h3 style='color:#1e293b; margin-bottom: 20px;'>📊 نسبة الإنجاز في المواد (محاضرات ومهام)</h3>", unsafe_allow_html=True)
     
